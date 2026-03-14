@@ -66,6 +66,15 @@ Deployment: Internal service, private VPC, port-forwarding access
 - **Infrastructure:** Terraform (GCP, GKE, Artifact Registry)
 - **CI/CD:** GitHub Actions (lint, test, build + terraform apply on main)
 
+## Git Workflow
+
+**Trunk-based development** — all commits go directly to `main`, no feature branches or PRs.
+
+- Commit directly to `main` branch
+- Do NOT create feature branches or pull requests
+- Run tests locally before pushing (`npm test`)
+- Use `[SDD]` prefix for pipeline commits
+
 ## Coding Conventions
 
 - Use async/await for all asynchronous operations
@@ -83,6 +92,7 @@ Deployment: Internal service, private VPC, port-forwarding access
 - NEVER modify files in `.claude/` or `sdd-config.yaml` protected files
 - NEVER commit `.tfvars` files with secrets — use GitHub Actions secrets for sensitive values
 - NEVER hardcode GCP project IDs or credentials in Terraform — use variables + GitHub Actions secrets
+- NEVER create feature branches or pull requests — trunk-based development only
 
 ## Agent-Specific Guidance
 
