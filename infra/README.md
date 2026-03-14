@@ -238,4 +238,4 @@ gcloud iam service-accounts add-iam-policy-binding \
 
 ---
 
-*Last updated: Infrastructure includes MongoDB StatefulSet on GKE with auto-generated credentials.*
+*Last updated: Infrastructure includes MongoDB StatefulSet on GKE with auto-generated credentials. Engine deployed via CI/CD on every commit.*
