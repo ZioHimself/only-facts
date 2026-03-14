@@ -169,3 +169,61 @@ Implement a centralized configuration module at `src/config/index.ts` that provi
 - [ ] All verification gates above are green
 - [ ] Design doc exists at `docs/sdd/foundation/config-module/design.md`
 - [ ] Test handoff exists at `docs/sdd/foundation/config-module/test-handoff.md`
+
+---
+
+## Task: express-server
+
+**Type:** Technical Task
+**Summary:** Create Express.js HTTP server with health endpoint, graceful shutdown, and standardized API response envelope.
+
+**Risk:** HOTL — reversibility: high, consequence: isolated
+
+[Addresses: G-1, G-2 (enables API layer for signal ingestion and report generation)]
+
+### Description
+
+Implement the core Express.js HTTP server that will host all API endpoints for the campaign detection pipeline. The server must use the centralized config module for port configuration, implement a health check endpoint for container orchestration, support graceful shutdown for zero-downtime deployments, and establish the standardized API response envelope pattern. This task provides the HTTP foundation for all subsequent API development.
+
+### Dependencies
+
+- Depends on: project-scaffolding, config-module
+- Blocks: mongodb-connection, logging, ci-cd-pipeline
+
+### Acceptance Criteria
+
+#### Functional Criteria (what the code must do)
+
+- [ ] VERIFY: `src/app.ts` exists and exports an Express application instance (not started)
+- [ ] VERIFY: `src/index.ts` imports the app and starts the server using `config.port`
+- [ ] VERIFY: Health endpoint `GET /health` exists and returns `{ success: true, data: { status: "ok" } }`
+- [ ] VERIFY: Health endpoint returns HTTP 200 status code
+- [ ] VERIFY: All API responses follow the envelope pattern: `{ success: boolean, data?: T, error?: { code: string, message: string } }`
+- [ ] VERIFY: Server logs startup message with port number using `console.log` (logging module not yet available)
+- [ ] VERIFY: Graceful shutdown handler exists for `SIGTERM` and `SIGINT` signals
+- [ ] VERIFY: Graceful shutdown closes the HTTP server and exits with code 0
+- [ ] VERIFY: `src/types/api.ts` exports `ApiResponse<T>` interface matching the envelope pattern
+- [ ] VERIFY: `src/middleware/error-handler.ts` exists with global error handling middleware
+
+#### Boundary Criteria (what the code must NOT do)
+
+- [ ] VERIFY: No `any` types in server code
+- [ ] VERIFY: Server does not start automatically on module import (app.ts exports app, index.ts starts it)
+- [ ] VERIFY: No hardcoded port values — must use `config.port`
+- [ ] VERIFY: No direct `process.env` access — must use config module
+- [ ] VERIFY: Error handler does not expose stack traces in production (`NODE_ENV=production`)
+
+#### Verification Gates (automated checks that must pass)
+
+- [ ] `npm run build` compiles without errors
+- [ ] `npm run lint` passes with zero errors
+- [ ] `npm test` passes — server tests exist and pass
+- [ ] `npx tsc --noEmit` passes type checking
+- [ ] Unit tests cover: app creation, health endpoint response
+- [ ] Integration tests cover: health endpoint HTTP request/response, error handling middleware
+
+#### Definition of Done
+
+- [ ] All verification gates above are green
+- [ ] Design doc exists at `docs/sdd/foundation/express-server/design.md`
+- [ ] Test handoff exists at `docs/sdd/foundation/express-server/test-handoff.md`
