@@ -3,4 +3,4 @@
  * Re-export all types from this module for clean imports.
  */
 
-export {};
+export * from './api.js';
