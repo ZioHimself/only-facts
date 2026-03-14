@@ -10,11 +10,10 @@
 |---|------|------|------|--------------|
 | 1 | project-scaffolding | Technical | HOTL | none |
 | 2 | config-module | Technical | HOTL | project-scaffolding |
-| 3 | task-3-error-handling.md | Technical | HOTL | project-scaffolding |
-| 4 | express-server | Technical | HOTL | project-scaffolding, config-module, error-handling |
-| 5 | mongodb-connection | Technical | HOTL | express-server, config-module |
-| 6 | logging | Technical | HOTL | express-server |
-| 7 | ci-cd-pipeline | Technical | HIC | project-scaffolding, express-server, mongodb-connection |
+| 3 | express-server | Technical | HOTL | project-scaffolding, config-module |
+| 4 | mongodb-connection | Technical | HOTL | express-server, config-module |
+| 5 | logging | Technical | HOTL | express-server |
+| 6 | ci-cd-pipeline | Technical | HIC | project-scaffolding, express-server, mongodb-connection |
 
 ---
 
@@ -24,7 +23,6 @@
 project-scaffolding
     ├── config-module
     │       └── mongodb-connection
-    ├── error-handling
     │       └── express-server
     │               ├── mongodb-connection
     │               ├── logging
@@ -38,11 +36,10 @@ project-scaffolding
 
 1. **project-scaffolding** — No dependencies, must be first
 2. **config-module** — Needs scaffolding for TypeScript
-3. **error-handling** — Needs scaffolding for TypeScript
-4. **express-server** — Needs config + error handling
-5. **mongodb-connection** — Needs express + config
-6. **logging** — Needs express server
-7. **ci-cd-pipeline** — Needs all above for meaningful CI
+3. **express-server** — Needs config
+4. **mongodb-connection** — Needs express + config
+5. **logging** — Needs express server
+6. **ci-cd-pipeline** — Needs all above for meaningful CI
 
 ---
 
@@ -60,9 +57,9 @@ project-scaffolding
 ## Estimated Effort
 
 For a 24h hackathon with experienced developers:
-- Tasks 1-3: Can be parallelized after scaffolding
-- Tasks 4-5: Sequential, core integration work
-- Tasks 6-7: Can be parallelized
+- Tasks 1-2: Sequential (scaffolding then config)
+- Tasks 3-4: Sequential, core integration work
+- Tasks 5-6: Can be parallelized after server is up
 
 **Critical path:** project-scaffolding → config-module → express-server → mongodb-connection → ci-cd-pipeline
 
@@ -84,7 +81,7 @@ Set up the foundational TypeScript project structure for the only-facts campaign
 ### Dependencies
 
 - Depends on: none
-- Blocks: config-module, error-handling, express-server, logging, ci-cd-pipeline
+- Blocks: config-module, express-server, logging, ci-cd-pipeline
 
 ### Acceptance Criteria
 
