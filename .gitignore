@@ -65,7 +65,7 @@ Desktop.ini
 *.tfplan
 *.tfvars
 !terraform.tfvars.example
-!environments/*.tfvars
+!**/environments/*.tfvars
 crash.log
 crash.*.log
 override.tf
