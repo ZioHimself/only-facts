@@ -92,3 +92,9 @@ npm run cluster:pipeline -w @only-facts/engine -- --language English --window-ho
 Final output includes:
 - Top bot-like cluster: bot likelihood, cluster size, top keywords
 - Top organic-like cluster: bot likelihood, cluster size, top keywords
+
+Optional report filters to avoid tiny clusters:
+
+```powershell
+npm run cluster:pipeline -w @only-facts/engine -- --language English --limit 12000 --top-n 5 --min-report-post-count 10 --min-report-unique-accounts 3
+```

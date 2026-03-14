@@ -23,6 +23,8 @@ interface CliOptions {
   readonly endDate: Date | null;
   readonly limit: number | null;
   readonly topN: number;
+  readonly minReportPostCount: number;
+  readonly minReportUniqueAccounts: number;
 }
 
 const DEFAULT_OPTIONS: CliOptions = {
@@ -36,6 +38,8 @@ const DEFAULT_OPTIONS: CliOptions = {
   endDate: null,
   limit: null,
   topN: 5,
+  minReportPostCount: 1,
+  minReportUniqueAccounts: 1,
 };
 
 function parseNumberFlag(value: string | undefined, fallback: number, flagName: string): number {
@@ -98,6 +102,16 @@ function parseArgs(argv: string[]): CliOptions {
     endDate: parseDateFlag(args.get('--end-date'), '--end-date'),
     limit: args.has('--limit') ? parseNumberFlag(args.get('--limit'), 0, '--limit') : null,
     topN: parseNumberFlag(args.get('--top-n'), DEFAULT_OPTIONS.topN, '--top-n'),
+    minReportPostCount: parseNumberFlag(
+      args.get('--min-report-post-count'),
+      DEFAULT_OPTIONS.minReportPostCount,
+      '--min-report-post-count'
+    ),
+    minReportUniqueAccounts: parseNumberFlag(
+      args.get('--min-report-unique-accounts'),
+      DEFAULT_OPTIONS.minReportUniqueAccounts,
+      '--min-report-unique-accounts'
+    ),
   };
 }
 
@@ -324,6 +338,8 @@ async function main(): Promise<void> {
     const reportQuery = {
       runId,
       botBehavior: { $ne: null },
+      'coordination.postCount': { $gte: options.minReportPostCount },
+      'coordination.uniqueAccountCount': { $gte: options.minReportUniqueAccounts },
     };
 
     const [topBotCluster] = (await BaselineClusterModel.find(reportQuery)
@@ -347,6 +363,11 @@ async function main(): Promise<void> {
           totalWindows: clusteringResult.totalWindows,
           totalClusters: clusteringResult.totalClusters,
           droppedSmallClusters: clusteringResult.droppedSmallClusters,
+          reportFilters: {
+            topN: options.topN,
+            minReportPostCount: options.minReportPostCount,
+            minReportUniqueAccounts: options.minReportUniqueAccounts,
+          },
         },
         null,
         2
