@@ -76,7 +76,7 @@ jobs:
       - name: Get GKE credentials
         uses: google-github-actions/get-gke-credentials@v2
         with:
-          cluster_name: only-facts-prod
+          cluster_name: only-facts-gke-prod
           location: ${{ vars.GCP_REGION }}
 
       - name: Deploy to GKE

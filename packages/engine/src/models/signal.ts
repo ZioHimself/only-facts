@@ -78,7 +78,7 @@ const signalSchema = new Schema<Signal>(
   }
 );
 
-signalSchema.index({ platform: 1, externalId: 1 }, { unique: true });
+signalSchema.index({ platform: 1, externalId: 1 }, { unique: true, sparse: true });
 signalSchema.index({ authorId: 1, createdAt: -1 });
 signalSchema.index({ conversationId: 1, createdAt: -1 });
 
