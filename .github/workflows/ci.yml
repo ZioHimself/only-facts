@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -40,3 +40,47 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:${{ github.sha }}"
+          IMAGE_LATEST="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:latest"
+
+          docker build -t $IMAGE_TAG -t $IMAGE_LATEST -f packages/engine/Dockerfile .
+          docker push $IMAGE_TAG
+          docker push $IMAGE_LATEST
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: only-facts-prod
+          location: ${{ vars.GCP_REGION }}
+
+      - name: Deploy to GKE
+        run: |
+          kubectl set image deployment/only-facts \
+            only-facts=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:${{ github.sha }} \
+            -n only-facts
