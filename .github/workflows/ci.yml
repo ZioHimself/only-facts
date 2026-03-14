@@ -31,9 +31,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Type check
+      - name: Type check (engine)
         run: npx tsc --noEmit
         working-directory: packages/engine
+
+      - name: Type check (reports)
+        run: npx tsc --noEmit
+        working-directory: packages/reports
 
       - name: Test with coverage
         run: npm run test:coverage -w @only-facts/engine
@@ -64,12 +68,24 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
 
-      - name: Build and push Docker image
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and push Engine Docker image
         run: |
           IMAGE_TAG="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:${{ github.sha }}"
           IMAGE_LATEST="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:latest"
 
           docker build -t $IMAGE_TAG -t $IMAGE_LATEST -f packages/engine/Dockerfile .
+          docker push $IMAGE_TAG
+          docker push $IMAGE_LATEST
+
+      - name: Build and push Reports Docker image
+        run: |
+          IMAGE_TAG="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/reports:${{ github.sha }}"
+          IMAGE_LATEST="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/reports:latest"
+
+          docker build -t $IMAGE_TAG -t $IMAGE_LATEST -f packages/reports/Dockerfile .
           docker push $IMAGE_TAG
           docker push $IMAGE_LATEST
 
@@ -79,8 +95,14 @@ jobs:
           cluster_name: only-facts-gke-prod
           location: ${{ vars.GCP_REGION }}
 
-      - name: Deploy to GKE
+      - name: Deploy Engine to GKE
         run: |
-          kubectl set image deployment/only-facts \
-            only-facts=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:${{ github.sha }} \
+          kubectl set image deployment/only-facts-engine \
+            only-facts-engine=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/engine:${{ github.sha }} \
+            -n only-facts
+
+      - name: Deploy Reports to GKE
+        run: |
+          kubectl set image deployment/only-facts-reports \
+            only-facts-reports=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/reports:${{ github.sha }} \
             -n only-facts

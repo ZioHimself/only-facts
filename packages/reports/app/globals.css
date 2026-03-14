@@ -1,0 +1,22 @@
+:root {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(90% 70% at 50% 15%, #090d13 0%, #05070a 52%, #030508 100%);
+  color: #c9d1d9;
+  font-family: var(--font-ibm-plex-sans), "Roboto", Arial, sans-serif;
+}
+
+button {
+  font: inherit;
+}

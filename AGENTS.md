@@ -14,12 +14,12 @@ This is an npm workspaces monorepo with the following packages:
 | Package | Description |
 |---------|-------------|
 | `@only-facts/engine` | Backend API — scraping, normalizing, analyzing signals |
-| `@only-facts/reports` | Frontend — reporting dashboard (Next.js) — *planned* |
+| `@only-facts/reports` | Frontend — reporting dashboard (Next.js) |
 
 ## Architecture
 
 - **Engine** (`packages/engine/`) — Express.js API for signal ingestion, analysis, and campaign detection
-- **Reports** (`packages/reports/`) — Next.js dashboard for viewing reports and evidence chains (planned)
+- **Reports** (`packages/reports/`) — Next.js dashboard for viewing reports and evidence chains
 - **Data Store** — MongoDB for flexible document storage (campaigns, evidence, reports)
 - **Integrations** — Platform APIs, threat intel sources, trust & safety channels
 
@@ -36,6 +36,9 @@ Deployment: Internal service, private VPC, port-forwarding access
 | `packages/engine/src/models/` | Mongoose models |
 | `packages/engine/src/services/` | Business logic |
 | `packages/engine/tests/` | Engine test files |
+| `packages/reports/app/` | Reports Next.js app source |
+| `packages/reports/app/components/` | React components |
+| `packages/reports/app/api/` | Next.js API routes |
 | `docs/` | Project documentation (shared) |
 | `.claude/` | SDD framework files (DO NOT MODIFY) |
 
@@ -46,6 +49,7 @@ Deployment: Internal service, private VPC, port-forwarding access
 | Install | `npm install` (from workspace root) |
 | Build (all) | `npm run build` |
 | Build (engine) | `npm run build -w @only-facts/engine` |
+| Build (reports) | `npm run build -w @only-facts/reports` |
 | Test (all) | `npm test` |
 | Test (engine) | `npm test -w @only-facts/engine` |
 | Test (single file) | `npm test -w @only-facts/engine -- {file}` |
@@ -53,14 +57,23 @@ Deployment: Internal service, private VPC, port-forwarding access
 | Lint | `npm run lint` |
 | Format | `npm run format` |
 | Run engine locally | `npm run dev:engine` |
+| Run reports locally | `npm run dev:reports` |
 
 ## Tech Stack
 
+### Engine
 - **Language:** TypeScript ^5.0
 - **Runtime:** Node.js ^20.x LTS
 - **Framework:** Express
 - **Database:** MongoDB with Mongoose ODM
 - **Test framework:** Jest with ts-jest, Supertest
+
+### Reports
+- **Language:** TypeScript ^5.0
+- **Framework:** Next.js 15 (App Router)
+- **UI:** React 19
+
+### Shared
 - **Linting:** ESLint
 - **Formatting:** Prettier
 - **Infrastructure:** Terraform (GCP, GKE, Artifact Registry)
