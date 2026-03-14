@@ -25,6 +25,10 @@ resource "google_container_cluster" "only_facts" {
       cidr_block   = google_compute_subnetwork.only_facts.ip_cidr_range
       display_name = "VPC Subnet"
     }
+    cidr_blocks {
+      cidr_block   = "0.0.0.0/0"
+      display_name = "GitHub Actions and external access"
+    }
   }
 
   ip_allocation_policy {
