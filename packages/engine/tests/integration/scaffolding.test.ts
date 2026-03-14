@@ -2,27 +2,32 @@
  * Integration tests for project scaffolding.
  * Verifies that all configuration files exist, parse correctly,
  * and have the required structure and values.
+ *
+ * This is a monorepo setup:
+ * - PACKAGE_ROOT: packages/engine (package-specific configs)
+ * - WORKSPACE_ROOT: repository root (shared configs like .prettierrc, .gitignore)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 
-const ROOT = process.cwd();
+const PACKAGE_ROOT = process.cwd();
+const WORKSPACE_ROOT = path.resolve(PACKAGE_ROOT, '../..');
 
 describe('Project Scaffolding Integration Tests', () => {
   describe('package.json', () => {
     let packageJson: Record<string, unknown>;
 
     beforeAll(() => {
-      const filePath = path.join(ROOT, 'package.json');
+      const filePath = path.join(PACKAGE_ROOT, 'package.json');
       expect(fs.existsSync(filePath)).toBe(true);
       const content = fs.readFileSync(filePath, 'utf-8');
       packageJson = JSON.parse(content);
     });
 
-    it('should have name "only-facts"', () => {
-      expect(packageJson.name).toBe('only-facts');
+    it('should have name "@only-facts/engine"', () => {
+      expect(packageJson.name).toBe('@only-facts/engine');
     });
 
     it('should have build script', () => {
@@ -55,7 +60,7 @@ describe('Project Scaffolding Integration Tests', () => {
     let tsconfig: Record<string, unknown>;
 
     beforeAll(() => {
-      const filePath = path.join(ROOT, 'tsconfig.json');
+      const filePath = path.join(PACKAGE_ROOT, 'tsconfig.json');
       expect(fs.existsSync(filePath)).toBe(true);
       const content = fs.readFileSync(filePath, 'utf-8');
       tsconfig = JSON.parse(content);
@@ -86,7 +91,7 @@ describe('Project Scaffolding Integration Tests', () => {
     let eslintConfigContent: string;
 
     beforeAll(() => {
-      const filePath = path.join(ROOT, 'eslint.config.js');
+      const filePath = path.join(PACKAGE_ROOT, 'eslint.config.js');
       expect(fs.existsSync(filePath)).toBe(true);
       eslintConfigContent = fs.readFileSync(filePath, 'utf-8');
     });
@@ -105,11 +110,11 @@ describe('Project Scaffolding Integration Tests', () => {
     });
   });
 
-  describe('.prettierrc', () => {
+  describe('.prettierrc (workspace root)', () => {
     let prettierConfig: Record<string, unknown>;
 
     beforeAll(() => {
-      const filePath = path.join(ROOT, '.prettierrc');
+      const filePath = path.join(WORKSPACE_ROOT, '.prettierrc');
       expect(fs.existsSync(filePath)).toBe(true);
       const content = fs.readFileSync(filePath, 'utf-8');
       prettierConfig = JSON.parse(content);
@@ -124,12 +129,12 @@ describe('Project Scaffolding Integration Tests', () => {
 
   describe('jest.config.ts', () => {
     it('should exist', () => {
-      const filePath = path.join(ROOT, 'jest.config.ts');
+      const filePath = path.join(PACKAGE_ROOT, 'jest.config.ts');
       expect(fs.existsSync(filePath)).toBe(true);
     });
 
     it('should contain ts-jest preset', () => {
-      const filePath = path.join(ROOT, 'jest.config.ts');
+      const filePath = path.join(PACKAGE_ROOT, 'jest.config.ts');
       const content = fs.readFileSync(filePath, 'utf-8');
       expect(content).toContain('ts-jest');
     });
@@ -139,26 +144,26 @@ describe('Project Scaffolding Integration Tests', () => {
     const srcDirs = ['config', 'models', 'services', 'routes', 'middleware', 'utils', 'types'];
 
     it.each(srcDirs)('should have src/%s directory', (dir) => {
-      const dirPath = path.join(ROOT, 'src', dir);
+      const dirPath = path.join(PACKAGE_ROOT, 'src', dir);
       expect(fs.existsSync(dirPath)).toBe(true);
     });
 
     it('should have tests/unit directory', () => {
-      const dirPath = path.join(ROOT, 'tests', 'unit');
+      const dirPath = path.join(PACKAGE_ROOT, 'tests', 'unit');
       expect(fs.existsSync(dirPath)).toBe(true);
     });
 
     it('should have tests/integration directory', () => {
-      const dirPath = path.join(ROOT, 'tests', 'integration');
+      const dirPath = path.join(PACKAGE_ROOT, 'tests', 'integration');
       expect(fs.existsSync(dirPath)).toBe(true);
     });
   });
 
-  describe('.env.example', () => {
+  describe('.env.example (workspace root)', () => {
     let envContent: string;
 
     beforeAll(() => {
-      const filePath = path.join(ROOT, '.env.example');
+      const filePath = path.join(WORKSPACE_ROOT, '.env.example');
       expect(fs.existsSync(filePath)).toBe(true);
       envContent = fs.readFileSync(filePath, 'utf-8');
     });
@@ -182,16 +187,16 @@ describe('Project Scaffolding Integration Tests', () => {
 
   describe('src/index.ts entry point', () => {
     it('should exist', () => {
-      const filePath = path.join(ROOT, 'src', 'index.ts');
+      const filePath = path.join(PACKAGE_ROOT, 'src', 'index.ts');
       expect(fs.existsSync(filePath)).toBe(true);
     });
   });
 
-  describe('.gitignore', () => {
+  describe('.gitignore (workspace root)', () => {
     let gitignoreContent: string;
 
     beforeAll(() => {
-      const filePath = path.join(ROOT, '.gitignore');
+      const filePath = path.join(WORKSPACE_ROOT, '.gitignore');
       expect(fs.existsSync(filePath)).toBe(true);
       gitignoreContent = fs.readFileSync(filePath, 'utf-8');
     });
@@ -216,7 +221,7 @@ describe('Project Scaffolding Integration Tests', () => {
   describe('Build verification', () => {
     it('should compile TypeScript without errors', () => {
       expect(() => {
-        execSync('npx tsc --noEmit', { cwd: ROOT, stdio: 'pipe' });
+        execSync('npx tsc --noEmit', { cwd: PACKAGE_ROOT, stdio: 'pipe' });
       }).not.toThrow();
     });
   });
@@ -224,7 +229,7 @@ describe('Project Scaffolding Integration Tests', () => {
   describe('Lint verification', () => {
     it('should pass linting', () => {
       expect(() => {
-        execSync('npm run lint', { cwd: ROOT, stdio: 'pipe' });
+        execSync('npm run lint', { cwd: PACKAGE_ROOT, stdio: 'pipe' });
       }).not.toThrow();
     });
   });

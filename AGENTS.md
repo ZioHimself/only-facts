@@ -7,10 +7,19 @@
 It constructs evidence chains, files reports to platform trust and safety channels, and documents platform responses for regulatory compliance.
 Internal service accessed via private VPC port-forwarding.
 
+## Monorepo Structure
+
+This is an npm workspaces monorepo with the following packages:
+
+| Package | Description |
+|---------|-------------|
+| `@only-facts/engine` | Backend API — scraping, normalizing, analyzing signals |
+| `@only-facts/reports` | Frontend — reporting dashboard (Next.js) — *planned* |
+
 ## Architecture
 
-- **API Layer** — Express.js REST endpoints for signal ingestion and report generation
-- **Analysis Engine** — Campaign detection and evidence chain construction
+- **Engine** (`packages/engine/`) — Express.js API for signal ingestion, analysis, and campaign detection
+- **Reports** (`packages/reports/`) — Next.js dashboard for viewing reports and evidence chains (planned)
 - **Data Store** — MongoDB for flexible document storage (campaigns, evidence, reports)
 - **Integrations** — Platform APIs, threat intel sources, trust & safety channels
 
@@ -22,33 +31,28 @@ Deployment: Internal service, private VPC, port-forwarding access
 
 | Directory | Contains |
 |-----------|----------|
-| `src/` | Production source code |
-| `src/routes/` | Express route handlers |
-| `src/models/` | Mongoose models |
-| `src/services/` | Business logic |
-| `tests/` | Test files |
-| `infra/` | Terraform infrastructure-as-code (GCP/GKE) |
-| `docs/` | Project documentation |
+| `packages/engine/src/` | Engine production source code |
+| `packages/engine/src/routes/` | Express route handlers |
+| `packages/engine/src/models/` | Mongoose models |
+| `packages/engine/src/services/` | Business logic |
+| `packages/engine/tests/` | Engine test files |
+| `docs/` | Project documentation (shared) |
 | `.claude/` | SDD framework files (DO NOT MODIFY) |
 
 ## Build, Test, Run
 
 | Action | Command |
 |--------|---------|
-| Install | `npm install` |
-| Build | `npm run build` |
+| Install | `npm install` (from workspace root) |
+| Build (all) | `npm run build` |
+| Build (engine) | `npm run build -w @only-facts/engine` |
 | Test (all) | `npm test` |
-| Test (single file) | `npx jest {file}` |
+| Test (engine) | `npm test -w @only-facts/engine` |
+| Test (single file) | `npm test -w @only-facts/engine -- {file}` |
 | Test (coverage) | `npm run test:coverage` |
 | Lint | `npm run lint` |
-| Lint (single file) | `npx eslint {file}` |
 | Format | `npm run format` |
-| Format (single file) | `npx prettier --write {file}` |
-| Type check | `npx tsc --noEmit` |
-| Run locally | `npm run dev` |
-| Terraform init | `cd infra && terraform init` |
-| Terraform validate | `cd infra && terraform validate` |
-| Terraform plan | `cd infra && terraform plan` |
+| Run engine locally | `npm run dev:engine` |
 
 ## Tech Stack
 
@@ -66,7 +70,7 @@ Deployment: Internal service, private VPC, port-forwarding access
 
 - Use async/await for all asynchronous operations
 - Error handling uses typed error classes, not raw throw
-- Database access only through Mongoose models in `src/models/`
+- Database access only through Mongoose models in `packages/engine/src/models/`
 - All API responses follow consistent envelope: `{ success, data?, error? }`
 - Environment variables accessed through a config module, never directly
 
@@ -97,6 +101,8 @@ Deployment: Internal service, private VPC, port-forwarding access
 
 ## Known Gotchas
 
-- Project is greenfield — no source code exists yet
+- This is a monorepo — run commands from workspace root, not package directories
+- Always use workspace flag `-w @only-facts/engine` when targeting a specific package
 - MongoDB connection requires local instance or connection string in `.env`
-- Tests require MongoDB (consider mongodb-memory-server for isolation)
+- Tests use mongodb-memory-server for isolation (no external MongoDB needed)
+- Shared configs (`.prettierrc`, `.env.example`, `.gitignore`) are at workspace root
