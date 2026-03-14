@@ -237,6 +237,47 @@ describe('Terraform File Contents', () => {
   });
 });
 
+describe('MongoDB Terraform Files', () => {
+  describe('mongodb.tf', () => {
+    let content: string;
+
+    beforeAll(() => {
+      const filePath = path.join(INFRA_DIR, 'mongodb.tf');
+      if (fs.existsSync(filePath)) {
+        content = fs.readFileSync(filePath, 'utf-8');
+      }
+    });
+
+    it('should have mongodb.tf file', () => {
+      expect(fs.existsSync(path.join(INFRA_DIR, 'mongodb.tf'))).toBe(true);
+    });
+
+    it('should define MongoDB namespace', () => {
+      expect(content).toMatch(/kubernetes_namespace.*mongodb/s);
+    });
+
+    it('should define MongoDB StatefulSet', () => {
+      expect(content).toMatch(/kubernetes_stateful_set.*mongodb/s);
+    });
+
+    it('should define MongoDB service', () => {
+      expect(content).toMatch(/kubernetes_service.*mongodb/s);
+    });
+
+    it('should define MongoDB credentials secret', () => {
+      expect(content).toMatch(/kubernetes_secret.*mongodb_credentials/s);
+    });
+
+    it('should use persistent volume for data', () => {
+      expect(content).toMatch(/volume_claim_template/);
+    });
+
+    it('should generate random passwords', () => {
+      expect(content).toMatch(/random_password.*mongodb/s);
+    });
+  });
+});
+
 describe('Bootstrap Terraform Files', () => {
   const BOOTSTRAP_DIR = path.join(INFRA_DIR, 'bootstrap');
 

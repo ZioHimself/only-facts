@@ -23,3 +23,14 @@ output "service_account_email" {
   description = "GKE workload identity service account email"
   value       = google_service_account.gke_workload.email
 }
+
+output "mongodb_internal_service" {
+  description = "MongoDB internal service DNS name"
+  value       = var.use_internal_mongodb ? "mongodb-internal.mongodb.svc.cluster.local:27017" : "N/A (using external MongoDB)"
+}
+
+output "mongodb_connection_uri" {
+  description = "MongoDB connection URI (sensitive)"
+  value       = local.mongodb_uri
+  sensitive   = true
+}

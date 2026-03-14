@@ -72,7 +72,9 @@ After bootstrap completes, set up GitHub repository variables and secrets.
 
 | Secret | Value | Description |
 |--------|-------|-------------|
-| `MONGO_URI` | `mongodb+srv://...` | MongoDB connection string |
+| `MONGO_URI` | `mongodb+srv://...` | (Optional) External MongoDB connection string. Only needed if `use_internal_mongodb = false` |
+
+> **Note:** By default, the infrastructure deploys MongoDB on GKE. No external MongoDB connection is required.
 
 ## Step 4: Verify Setup
 
@@ -90,6 +92,50 @@ git push
 
 Check GitHub Actions to verify the workflow runs successfully.
 
+## MongoDB Configuration
+
+By default, the infrastructure deploys MongoDB as a StatefulSet on GKE with:
+- **Persistent storage**: 10Gi PVC (configurable via `mongodb_storage_size`)
+- **Credentials**: Auto-generated random passwords
+- **Internal access**: Accessible within the cluster at `mongodb-internal.mongodb.svc.cluster.local:27017`
+
+### Internal MongoDB (Default)
+
+No additional configuration needed. The app connects via internal Kubernetes DNS.
+
+```hcl
+# environments/prod.tfvars
+use_internal_mongodb = true
+mongodb_storage_size = "10Gi"
+```
+
+### External MongoDB (MongoDB Atlas)
+
+To use an external MongoDB instance:
+
+```hcl
+# environments/prod.tfvars
+use_internal_mongodb = false
+
+# Set MONGO_URI as a GitHub secret, or via environment variable:
+# TF_VAR_mongo_uri="mongodb+srv://..."
+```
+
+### Accessing MongoDB
+
+For debugging, you can port-forward to MongoDB:
+
+```bash
+# Get cluster credentials
+gcloud container clusters get-credentials only-facts --region=us-central1
+
+# Port forward
+kubectl port-forward -n mongodb svc/mongodb-internal 27017:27017
+
+# Connect with mongosh
+mongosh mongodb://localhost:27017
+```
+
 ## Directory Structure
 
 ```
@@ -105,7 +151,8 @@ infra/
 ├── vpc.tf                  # VPC, subnet, NAT
 ├── gke.tf                  # GKE cluster
 ├── iam.tf                  # Service accounts
-├── kubernetes.tf           # K8s resources
+├── mongodb.tf              # MongoDB StatefulSet
+├── kubernetes.tf           # K8s resources (app)
 ├── artifact-registry.tf    # Container registry
 ├── terraform.tfvars.example
 └── environments/

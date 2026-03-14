@@ -43,11 +43,11 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -var-file=environments/prod.tfvars
         env:
-          TF_VAR_mongo_uri: ${{ secrets.MONGO_URI }}
           TF_VAR_gcp_project: ${{ vars.GCP_PROJECT }}
+          TF_VAR_mongo_uri: ${{ secrets.MONGO_URI || '' }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -var-file=environments/prod.tfvars
         env:
-          TF_VAR_mongo_uri: ${{ secrets.MONGO_URI }}
           TF_VAR_gcp_project: ${{ vars.GCP_PROJECT }}
+          TF_VAR_mongo_uri: ${{ secrets.MONGO_URI || '' }}

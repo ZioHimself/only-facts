@@ -21,9 +21,22 @@ variable "app_port" {
 }
 
 variable "mongo_uri" {
-  description = "MongoDB connection string"
+  description = "External MongoDB connection string (optional - leave empty to use internal MongoDB)"
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "use_internal_mongodb" {
+  description = "Deploy MongoDB on GKE (set to false if using external MongoDB)"
+  type        = bool
+  default     = true
+}
+
+variable "mongodb_storage_size" {
+  description = "Storage size for MongoDB persistent volume"
+  type        = string
+  default     = "10Gi"
 }
 
 variable "gke_node_count_min" {

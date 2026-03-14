@@ -1,3 +1,8 @@
+locals {
+  mongodb_internal_uri = "mongodb://only-facts:${random_password.mongodb_app.result}@mongodb-internal.mongodb.svc.cluster.local:27017/only-facts"
+  mongodb_uri          = var.use_internal_mongodb ? local.mongodb_internal_uri : var.mongo_uri
+}
+
 resource "kubernetes_namespace" "only_facts" {
   metadata {
     name = "only-facts"
@@ -18,10 +23,12 @@ resource "kubernetes_secret" "mongo_uri" {
   }
 
   data = {
-    MONGO_URI = var.mongo_uri
+    MONGO_URI = local.mongodb_uri
   }
 
   type = "Opaque"
+
+  depends_on = [kubernetes_stateful_set.mongodb]
 }
 
 resource "kubernetes_deployment" "only_facts" {
