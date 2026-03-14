@@ -92,6 +92,58 @@ describe('Config Module', () => {
     });
   });
 
+  describe('signalApiKeys parsing', () => {
+    it('should return empty array when SIGNAL_API_KEYS is not set', async () => {
+      delete process.env.SIGNAL_API_KEYS;
+      const { config } = await import('../../src/config');
+      expect(config.signalApiKeys).toEqual([]);
+    });
+
+    it('should parse comma-separated keys', async () => {
+      process.env.SIGNAL_API_KEYS = 'key1,key2,key3';
+      const { config } = await import('../../src/config');
+      expect(config.signalApiKeys).toEqual(['key1', 'key2', 'key3']);
+    });
+
+    it('should trim whitespace from keys', async () => {
+      process.env.SIGNAL_API_KEYS = ' key1 , key2 ';
+      const { config } = await import('../../src/config');
+      expect(config.signalApiKeys).toEqual(['key1', 'key2']);
+    });
+
+    it('should filter out empty keys', async () => {
+      process.env.SIGNAL_API_KEYS = 'key1,,key2,';
+      const { config } = await import('../../src/config');
+      expect(config.signalApiKeys).toEqual(['key1', 'key2']);
+    });
+  });
+
+  describe('rate limit config', () => {
+    it('should default signalRateLimitWindowMs to 60000', async () => {
+      delete process.env.SIGNAL_RATE_LIMIT_WINDOW_MS;
+      const { config } = await import('../../src/config');
+      expect(config.signalRateLimitWindowMs).toBe(60000);
+    });
+
+    it('should parse SIGNAL_RATE_LIMIT_WINDOW_MS from env', async () => {
+      process.env.SIGNAL_RATE_LIMIT_WINDOW_MS = '30000';
+      const { config } = await import('../../src/config');
+      expect(config.signalRateLimitWindowMs).toBe(30000);
+    });
+
+    it('should default signalRateLimitMax to 100', async () => {
+      delete process.env.SIGNAL_RATE_LIMIT_MAX;
+      const { config } = await import('../../src/config');
+      expect(config.signalRateLimitMax).toBe(100);
+    });
+
+    it('should parse SIGNAL_RATE_LIMIT_MAX from env', async () => {
+      process.env.SIGNAL_RATE_LIMIT_MAX = '50';
+      const { config } = await import('../../src/config');
+      expect(config.signalRateLimitMax).toBe(50);
+    });
+  });
+
   describe('immutability', () => {
     it('should return a frozen config object', async () => {
       const { config } = await import('../../src/config');

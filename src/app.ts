@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { healthRouter } from './routes/health.js';
+import { signalsRouter } from './routes/signals.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { AppError } from './utils/errors.js';
 import type { ApiResponse } from './types/api.js';
@@ -11,9 +12,10 @@ import type { ApiResponse } from './types/api.js';
  */
 export const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 
 app.use('/health', healthRouter);
+app.use(signalsRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(new AppError(`Route not found: ${req.method} ${req.path}`, 404));

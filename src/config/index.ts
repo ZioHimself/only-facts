@@ -9,6 +9,9 @@ export interface Config {
   readonly nodeEnv: string;
   readonly mongoUri: string;
   readonly logLevel: string;
+  readonly signalApiKeys: readonly string[];
+  readonly signalRateLimitWindowMs: number;
+  readonly signalRateLimitMax: number;
 }
 
 /**
@@ -43,12 +46,23 @@ function parsePort(portStr: string | undefined, defaultPort: number): number {
 /**
  * Builds the configuration object from environment variables.
  */
+function parseApiKeys(raw: string | undefined): readonly string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((key) => key.trim())
+    .filter((key) => key.length > 0);
+}
+
 function buildConfig(): Config {
   const config: Config = {
     port: parsePort(process.env.PORT, 3000),
     nodeEnv: process.env.NODE_ENV || 'development',
     mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017/only-facts',
     logLevel: process.env.LOG_LEVEL || 'debug',
+    signalApiKeys: parseApiKeys(process.env.SIGNAL_API_KEYS),
+    signalRateLimitWindowMs: parsePort(process.env.SIGNAL_RATE_LIMIT_WINDOW_MS, 60000),
+    signalRateLimitMax: parsePort(process.env.SIGNAL_RATE_LIMIT_MAX, 100),
   };
 
   validateConfig(config);
