@@ -8,9 +8,9 @@
 
 ### 1. Epic: foundation
 
-**Goal:** Establish project infrastructure — Express server, MongoDB connection, TypeScript config, and base models.
+**Goal:** Establish project infrastructure — Express server, MongoDB connection, TypeScript config, CI/CD pipeline, and base models.
 
-**Value:** All subsequent epics depend on a working API skeleton and database connectivity.
+**Value:** All subsequent epics depend on a working API skeleton, database connectivity, and automated quality gates.
 
 **Scope:**
 - Project scaffolding (package.json, tsconfig, eslint, prettier)
@@ -18,6 +18,11 @@
 - MongoDB connection with Mongoose
 - Base error handling and logging
 - Environment configuration module
+- CI/CD pipeline (GitHub Actions)
+  - Lint and type-check on PR/push
+  - Run test suite with coverage reporting
+  - Build verification
+  - Deploy to GCP via Terraform
 
 ---
 

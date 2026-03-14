@@ -44,10 +44,19 @@
 | Jest | Unit & Integration tests | With ts-jest |
 | Supertest | HTTP endpoint testing | Express integration |
 
+## CI/CD
+
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| GitHub Actions | CI/CD pipeline | Lint, test, build, deploy |
+| Terraform | Infrastructure as Code | GCP resource provisioning |
+
 ## Deployment
 
 | Aspect | Choice |
 |--------|--------|
+| Cloud Provider | Google Cloud Platform (GCP) |
+| Infrastructure | Terraform-managed |
 | Environment | Internal / Private VPC |
 | Access | Port-forwarding |
 | Containerization | TBD |
