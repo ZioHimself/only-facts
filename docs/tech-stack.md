@@ -51,6 +51,9 @@
 | GitHub Actions | CI/CD pipeline | Lint, test, build, deploy |
 | Terraform | Infrastructure as Code | GCP resource provisioning |
 
+# Trunk based development without Pull Requests
+We commit directly to main relying on CI / CD to deploy it directly to production.
+
 ## Deployment
 
 | Aspect | Choice |
