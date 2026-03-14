@@ -283,6 +283,7 @@ function toNarrativeCluster(cluster: WorkingCluster): BaselineNarrativeCluster {
     topTerms: cluster.topTerms,
     centroidSize: cluster.sumVector.size,
     coordination: emptyCoordination,
+    botBehavior: null,
   };
 }
 

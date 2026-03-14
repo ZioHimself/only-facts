@@ -15,6 +15,9 @@ function makePost(
     language: 'English',
     referencePostId: null,
     isRetweet: null,
+    followers: null,
+    following: null,
+    updates: null,
   };
 }
 

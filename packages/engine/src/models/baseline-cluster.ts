@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
-import type { CoordinationSignals } from '../types/clustering.js';
+import type { BotBehaviorSignals, CoordinationSignals } from '../types/clustering.js';
 
 export interface BaselineCluster {
   _id: mongoose.Types.ObjectId;
@@ -19,6 +19,7 @@ export interface BaselineCluster {
   topTerms: string[];
   centroidSize: number;
   coordination: CoordinationSignals;
+  botBehavior?: BotBehaviorSignals | null;
   createdAt: Date;
 }
 
@@ -53,6 +54,35 @@ const baselineClusterSchema = new Schema<BaselineCluster>(
       coordinationScore: { type: Number, required: true, index: true },
       flags: [{ type: String, required: true }],
     },
+    botBehavior: {
+      type: new Schema(
+        {
+          accountCount: { type: Number, required: true },
+          suspectedBotAccountCount: { type: Number, required: true },
+          suspectedBotAccountShare: { type: Number, required: true },
+          suspectedBotPostShare: { type: Number, required: true },
+          averageAccountSuspicion: { type: Number, required: true },
+          maxAccountSuspicion: { type: Number, required: true },
+          botLikelihoodScore: { type: Number, required: true },
+          topSuspectAccounts: [
+            {
+              accountId: { type: String, required: true },
+              postCount: { type: Number, required: true },
+              suspicionScore: { type: Number, required: true },
+              retweetShare: { type: Number, required: true },
+              duplicateTextShare: { type: Number, required: true },
+              burstShare10m: { type: Number, required: true },
+              medianInterPostMinutes: { type: Number, required: false, default: null },
+              flags: [{ type: String, required: true }],
+            },
+          ],
+          flags: [{ type: String, required: true }],
+        },
+        { _id: false }
+      ),
+      required: false,
+      default: null,
+    },
     createdAt: { type: Date, required: true, default: Date.now },
   },
   {
@@ -63,6 +93,7 @@ const baselineClusterSchema = new Schema<BaselineCluster>(
 
 baselineClusterSchema.index({ runId: 1, clusterId: 1 }, { unique: true });
 baselineClusterSchema.index({ windowStart: 1, windowEnd: 1 });
+baselineClusterSchema.index({ 'botBehavior.botLikelihoodScore': -1 }, { sparse: true });
 
 export const BaselineClusterModel =
   mongoose.models.BaselineCluster ||

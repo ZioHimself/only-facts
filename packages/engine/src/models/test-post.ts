@@ -9,6 +9,9 @@ export interface TestPost {
   metadata?: {
     language?: string | null;
     isRetweet?: boolean | null;
+    followers?: number | null;
+    following?: number | null;
+    updates?: number | null;
   };
 }
 
@@ -21,6 +24,9 @@ const testPostSchema = new Schema<TestPost>(
     metadata: {
       language: { type: String, required: false },
       isRetweet: { type: Boolean, required: false },
+      followers: { type: Number, required: false },
+      following: { type: Number, required: false },
+      updates: { type: Number, required: false },
     },
   },
   {

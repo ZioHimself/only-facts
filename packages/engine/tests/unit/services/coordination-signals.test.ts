@@ -17,6 +17,9 @@ function makePost(
     language: 'English',
     referencePostId,
     isRetweet,
+    followers: null,
+    following: null,
+    updates: null,
   };
 }
 
@@ -41,6 +44,17 @@ function makeCluster(postIds: string[], accountIds: string[]): BaselineNarrative
       synchronizedBurstShare: 0,
       synchronizedAccountsShare: 0,
       coordinationScore: 0,
+      flags: [],
+    },
+    botBehavior: {
+      accountCount: 0,
+      suspectedBotAccountCount: 0,
+      suspectedBotAccountShare: 0,
+      suspectedBotPostShare: 0,
+      averageAccountSuspicion: 0,
+      maxAccountSuspicion: 0,
+      botLikelihoodScore: 0,
+      topSuspectAccounts: [],
       flags: [],
     },
   };
