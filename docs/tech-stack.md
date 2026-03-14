@@ -48,8 +48,8 @@
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| GitHub Actions | CI/CD pipeline | Lint, test, build, deploy |
-| Terraform | Infrastructure as Code | GCP resource provisioning |
+| GitHub Actions | CI/CD pipeline | Lint, test, build + Terraform apply on main |
+| Terraform | Infrastructure as Code | VPC, GKE, IAM, Artifact Registry |
 
 # Trunk based development without Pull Requests
 We commit directly to main relying on CI / CD to deploy it directly to production.
@@ -60,9 +60,11 @@ We commit directly to main relying on CI / CD to deploy it directly to productio
 |--------|--------|
 | Cloud Provider | Google Cloud Platform (GCP) |
 | Infrastructure | Terraform-managed |
+| Container Orchestration | GKE (Google Kubernetes Engine) |
+| Container Registry | Artifact Registry |
 | Environment | Internal / Private VPC |
-| Access | Port-forwarding |
-| Containerization | TBD |
+| Access | Port-forwarding via kubectl or IAP |
+| Node Type | Preemptible/Spot VMs (cost-optimized) |
 
 ## External Integrations (Planned)
 

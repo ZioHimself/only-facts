@@ -48,9 +48,9 @@ project-scaffolding
 | Phase | Coverage |
 |-------|----------|
 | **Design** | Each task has design.md requirement |
-| **Implementation** | All source code in src/ |
-| **Testing** | Unit tests for all modules; integration tests for server + DB |
-| **Documentation** | ADR documents in docs/adr, .env.example |
+| **Implementation** | All source code in src/, infrastructure in infra/ |
+| **Testing** | Unit tests for all modules; integration tests for server + DB; Terraform validation |
+| **Documentation** | ADR documents in docs/adr, .env.example, terraform.tfvars.example |
 
 ---
 
@@ -59,9 +59,12 @@ project-scaffolding
 For a 24h hackathon with experienced developers:
 - Tasks 1-2: Sequential (scaffolding then config)
 - Tasks 3-4: Sequential, core integration work
-- Tasks 5-6: Can be parallelized after server is up
+- Task 5: Logging, can run in parallel after server is up
+- Task 6: CI/CD pipeline + Terraform infrastructure (expanded scope — includes full GCP/GKE IaC)
 
 **Critical path:** project-scaffolding → config-module → express-server → mongodb-connection → ci-cd-pipeline
+
+**Note:** Task 6 (ci-cd-pipeline) now includes Terraform infrastructure-as-code for GCP/GKE deployment. This is larger than a typical CI-only task but bundles related DevOps work together.
 
 ---
 
@@ -343,24 +346,24 @@ Implement a structured logging module using Winston that provides consistent JSO
 ## Task: ci-cd-pipeline
 
 **Type:** Technical Task
-**Summary:** Configure GitHub Actions CI pipeline with lint, type-check, test, and build stages.
+**Summary:** Configure GitHub Actions CI/CD pipeline and Terraform infrastructure-as-code for GCP/GKE deployment.
 
 **Risk:** HIC — reversibility: medium, consequence: team
 
-[Addresses: G-8 (automated quality gates for team collaboration)]
+[Addresses: G-8 (automated quality gates, infrastructure provisioning for internal VPC service)]
 
 ### Description
 
-Set up a GitHub Actions CI/CD pipeline that runs on every push and pull request. The pipeline must execute lint, type-check, test (with coverage), and build stages in sequence, failing fast on any error. This ensures code quality gates are enforced automatically and provides feedback to developers before merge. The pipeline should use caching for node_modules to optimize run times.
+Set up a GitHub Actions CI/CD pipeline that runs on every push and pull request, plus Terraform infrastructure-as-code for GCP/GKE deployment. The CI pipeline must execute lint, type-check, test (with coverage), and build stages in sequence, failing fast on any error. The Terraform configuration must define the complete infrastructure for the internal VPC service: networking, GKE cluster, database connectivity, and internal load balancing. On merge to main, Terraform automatically applies infrastructure changes (continuous deployment).
 
 ### Dependencies
 
 - Depends on: project-scaffolding, express-server, mongodb-connection
-- Blocks: none (enables future CD stages)
+- Blocks: none (enables future CD stages and infrastructure provisioning)
 
 ### Acceptance Criteria
 
-#### Functional Criteria (what the code must do)
+#### Functional Criteria — CI Pipeline (what the workflow must do)
 
 - [ ] VERIFY: `.github/workflows/ci.yml` exists with valid GitHub Actions syntax
 - [ ] VERIFY: Workflow triggers on `push` to `main` and on `pull_request`
@@ -373,17 +376,58 @@ Set up a GitHub Actions CI/CD pipeline that runs on every push and pull request.
 - [ ] VERIFY: Workflow uses `actions/cache` for `node_modules` with `package-lock.json` hash key
 - [ ] VERIFY: Workflow fails if any step fails (fail-fast behavior)
 
+#### Functional Criteria — Terraform Infrastructure (what the IaC must define)
+
+- [ ] VERIFY: `infra/` directory exists at project root with Terraform configuration
+- [ ] VERIFY: `infra/main.tf` exists with Google provider configuration (project, region parameterized)
+- [ ] VERIFY: `infra/variables.tf` exists with input variables: `environment`, `gcp_project`, `gcp_region`, `app_port`, `mongo_uri` (sensitive)
+- [ ] VERIFY: `infra/outputs.tf` exists with outputs: `gke_cluster_name`, `gke_cluster_endpoint`, `load_balancer_ip`
+- [ ] VERIFY: VPC module/resource defines: custom VPC, private subnet, Cloud NAT for egress, firewall rules
+- [ ] VERIFY: GKE cluster defined with: private nodes, workload identity enabled, release channel (REGULAR)
+- [ ] VERIFY: GKE node pool defined with: autoscaling (1-3 nodes), preemptible/spot VMs for cost savings (configurable)
+- [ ] VERIFY: Kubernetes namespace `only-facts` created via Terraform kubernetes provider
+- [ ] VERIFY: Kubernetes Deployment manifest for `only-facts` container (image placeholder, port, env vars from Secret)
+- [ ] VERIFY: Kubernetes Service (ClusterIP) and internal Ingress for load balancing within VPC
+- [ ] VERIFY: GCP Service Account for GKE workload identity with permissions: Artifact Registry reader, Secret Manager accessor, Cloud Logging writer
+- [ ] VERIFY: Artifact Registry repository for container images
+- [ ] VERIFY: `infra/terraform.tfvars.example` exists documenting required variable values (no secrets)
+
+#### Functional Criteria — Variable Management
+
+- [ ] VERIFY: `infra/*.tfvars` pattern added to `.gitignore` (local override files excluded from git)
+- [ ] VERIFY: `infra/terraform.tfvars.example` exists with placeholder values (no secrets)
+- [ ] VERIFY: Sensitive variables (`mongo_uri`, service account keys) sourced from GitHub Actions secrets in CI/CD
+- [ ] VERIFY: Non-sensitive variables (`environment`, `gcp_region`, `app_port`) defined in workflow or `infra/environments/*.tfvars` (committed)
+- [ ] VERIFY: `infra/environments/` directory exists with `prod.tfvars` (non-sensitive values only)
+
+#### Functional Criteria — Terraform CI/CD Workflow
+
+- [ ] VERIFY: `.github/workflows/terraform.yml` exists with CI/CD workflow
+- [ ] VERIFY: Terraform workflow triggers on changes to `infra/**` files
+- [ ] VERIFY: On pull request: runs `terraform init`, `terraform validate`, `terraform fmt -check`, `terraform plan`
+- [ ] VERIFY: On push to main: runs `terraform apply -auto-approve` after successful plan
+- [ ] VERIFY: Workflow uses `google-github-actions/auth` for GCP authentication via Workload Identity Federation (preferred) or service account key
+- [ ] VERIFY: Terraform state bucket and GCP project configured via GitHub Actions variables/secrets
+
 #### Boundary Criteria (what the code must NOT do)
 
-- [ ] VERIFY: No secrets or credentials hardcoded in workflow file
-- [ ] VERIFY: Workflow does not auto-deploy (CI only, no CD triggers)
-- [ ] VERIFY: No `continue-on-error: true` on quality gate steps (lint, typecheck, test, build)
+- [ ] VERIFY: No secrets or credentials hardcoded in workflow files or Terraform
+- [ ] VERIFY: No `.tfvars` files with actual values committed to git (only `.tfvars.example` and `environments/*.tfvars` with non-sensitive defaults)
+- [ ] VERIFY: No `continue-on-error: true` on quality gate steps (lint, typecheck, test, build, plan)
+- [ ] VERIFY: Terraform state backend is configured for remote state (GCS bucket) — bucket name sourced from GitHub Actions variables
+- [ ] VERIFY: No public ingress rules — GKE nodes are private, Ingress is internal-only
+- [ ] VERIFY: Sensitive variables marked with `sensitive = true` in Terraform
+- [ ] VERIFY: GKE master authorized networks restricted to VPC CIDR (no public access)
+- [ ] VERIFY: `terraform apply` only runs on main branch (not on PRs)
 
 #### Verification Gates (automated checks that must pass)
 
-- [ ] Workflow YAML is valid (GitHub Actions syntax)
+- [ ] CI workflow YAML is valid (GitHub Actions syntax)
 - [ ] Local simulation: `npm ci && npm run lint && npx tsc --noEmit && npm run test:coverage && npm run build` passes
-- [ ] Workflow runs successfully when pushed to GitHub (verify via Actions tab)
+- [ ] `terraform init` succeeds in `infra/` directory
+- [ ] `terraform validate` passes with no errors
+- [ ] `terraform fmt -check` passes (consistent formatting)
+- [ ] `terraform plan` succeeds with valid GCP credentials (manual verification)
 
 #### Definition of Done
 
@@ -391,3 +435,5 @@ Set up a GitHub Actions CI/CD pipeline that runs on every push and pull request.
 - [ ] Design doc exists at `docs/sdd/foundation/ci-cd-pipeline/design.md`
 - [ ] Test handoff exists at `docs/sdd/foundation/ci-cd-pipeline/test-handoff.md`
 - [ ] First CI run passes on main branch
+- [ ] Terraform CI/CD workflow passes on main branch (plan + apply succeeds)
+- [ ] CONFIRM: Infrastructure design reviewed for security (internal-only access, least-privilege IAM)
