@@ -9,8 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "cluster:baseline": "tsx src/scripts/run-tfidf-baseline.ts",
-    "test": "jest --forceExit",
-    "test:coverage": "jest --coverage --forceExit",
+    "test": "jest --runInBand --forceExit",
+    "test:coverage": "jest --coverage --runInBand --forceExit",
     "lint": "eslint src tests",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
   },
