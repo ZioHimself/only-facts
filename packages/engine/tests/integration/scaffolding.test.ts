@@ -127,14 +127,14 @@ describe('Project Scaffolding Integration Tests', () => {
     });
   });
 
-  describe('jest.config.ts', () => {
+  describe('jest.config.cjs', () => {
     it('should exist', () => {
-      const filePath = path.join(PACKAGE_ROOT, 'jest.config.ts');
+      const filePath = path.join(PACKAGE_ROOT, 'jest.config.cjs');
       expect(fs.existsSync(filePath)).toBe(true);
     });
 
     it('should contain ts-jest preset', () => {
-      const filePath = path.join(PACKAGE_ROOT, 'jest.config.ts');
+      const filePath = path.join(PACKAGE_ROOT, 'jest.config.cjs');
       const content = fs.readFileSync(filePath, 'utf-8');
       expect(content).toContain('ts-jest');
     });
