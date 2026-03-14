@@ -12,6 +12,18 @@ const config: Config = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  transform: {
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        useESM: false,
+        tsconfig: {
+          module: 'commonjs',
+          moduleResolution: 'node',
+        },
+      },
+    ],
+  },
 };
 
 export default config;
