@@ -8,6 +8,7 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "cluster:baseline": "tsx src/scripts/run-tfidf-baseline.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint src tests",

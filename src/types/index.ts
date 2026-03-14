@@ -4,3 +4,4 @@
  */
 
 export * from './api.js';
+export * from './clustering.js';
