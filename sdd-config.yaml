@@ -115,14 +115,14 @@ orchestrator:
 
 # --- REPOSITORY INTEGRATION ---
 repository:
-  enabled: true # discovered (git remote exists)
-  provider: "github" # discovered (github.com remote)
-  base_branch: "main" # discovered
+  enabled: false # trunk-based: direct commits to main, no PRs
+  provider: "github"
+  base_branch: "main"
   pr_title_prefix: ""
   default_reviewers: []
   github:
-    owner: "ZioHimself" # discovered (from remote URL)
-    repo: "only-facts" # discovered (from remote URL)
+    owner: "ZioHimself"
+    repo: "only-facts"
   bitbucket:
     workspace: ""
     repo_slug: ""
