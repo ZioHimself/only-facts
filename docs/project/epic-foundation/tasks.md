@@ -120,3 +120,55 @@ Set up the foundational TypeScript project structure for the only-facts campaign
 - [ ] All verification gates above are green
 - [ ] Design doc exists at `docs/sdd/foundation/project-scaffolding/design.md`
 - [ ] Test handoff exists at `docs/sdd/foundation/project-scaffolding/test-handoff.md`
+
+---
+
+## Task: config-module
+
+**Type:** Technical Task
+**Summary:** Create centralized configuration module for type-safe environment variable access with validation.
+
+**Risk:** HOTL — reversibility: high, consequence: isolated
+
+[Addresses: G-8 (env-based configuration, no secrets in codebase)]
+
+### Description
+
+Implement a centralized configuration module at `src/config/index.ts` that provides type-safe access to all environment variables. The module must validate required variables at startup, provide sensible defaults for optional variables, and export a frozen config object. This prevents direct `process.env` access throughout the codebase (as specified in best-practices.md) and ensures configuration errors are caught early.
+
+### Dependencies
+
+- Depends on: project-scaffolding
+- Blocks: express-server, mongodb-connection
+
+### Acceptance Criteria
+
+#### Functional Criteria (what the code must do)
+
+- [ ] VERIFY: `src/config/index.ts` exists and exports a `config` object
+- [ ] VERIFY: `config` object includes typed properties: `port` (number), `nodeEnv` (string), `mongoUri` (string), `logLevel` (string)
+- [ ] VERIFY: Config values are read from `process.env` with fallback defaults: `PORT=3000`, `NODE_ENV=development`, `LOG_LEVEL=debug`
+- [ ] VERIFY: `MONGO_URI` is required — module throws `ConfigurationError` if missing in production (`NODE_ENV=production`)
+- [ ] VERIFY: Config object is frozen (`Object.freeze` or `as const` assertion)
+- [ ] VERIFY: A `ConfigurationError` class exists in `src/utils/errors.ts` or `src/config/errors.ts`
+- [ ] VERIFY: `validateConfig()` function exists and is called on module load
+
+#### Boundary Criteria (what the code must NOT do)
+
+- [ ] VERIFY: No `any` types in the config module
+- [ ] VERIFY: No direct `process.env` access outside `src/config/` directory
+- [ ] VERIFY: No hardcoded secrets or credentials in any file
+
+#### Verification Gates (automated checks that must pass)
+
+- [ ] `npm run build` compiles without errors
+- [ ] `npm run lint` passes with zero errors
+- [ ] `npm test` passes — config module unit tests exist and pass
+- [ ] `npx tsc --noEmit` passes type checking
+- [ ] Unit tests cover: valid config, missing required env var, default values
+
+#### Definition of Done
+
+- [ ] All verification gates above are green
+- [ ] Design doc exists at `docs/sdd/foundation/config-module/design.md`
+- [ ] Test handoff exists at `docs/sdd/foundation/config-module/test-handoff.md`
