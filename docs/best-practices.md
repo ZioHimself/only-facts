@@ -147,6 +147,146 @@ export const config = {
 
 ---
 
+## 5. Infrastructure as Code (Terraform)
+
+### Directory Structure
+
+```
+infra/
+├── main.tf              # Provider config, backend, module calls
+├── variables.tf         # Input variable definitions
+├── outputs.tf           # Output values
+├── versions.tf          # Provider version constraints
+├── terraform.tfvars.example  # Template for local overrides (committed)
+├── environments/
+│   └── prod.tfvars      # Non-sensitive production values (committed)
+└── modules/             # Reusable modules (if needed)
+```
+
+### Naming Conventions
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Resources | snake_case with prefix | `google_container_cluster.only_facts_gke` |
+| Variables | snake_case | `gcp_project`, `app_port` |
+| Outputs | snake_case | `gke_cluster_endpoint` |
+| Files | kebab-case or standard tf names | `main.tf`, `gke-cluster.tf` |
+| Modules | kebab-case directories | `modules/gke-cluster/` |
+
+### Do
+- Use variables for all environment-specific values
+- Mark sensitive variables with `sensitive = true`
+- Use remote state backend (GCS) with locking
+- Pin provider versions in `versions.tf`
+- Use `terraform fmt` before committing
+
+### Don't
+- Commit `.tfvars` files with secrets — use GitHub Actions secrets
+- Hardcode project IDs, regions, or credentials
+- Use `local-exec` provisioners — prefer native resources
+- Store state locally — always use remote backend
+
+### Variable Management
+
+```hcl
+# variables.tf — define with descriptions and validation
+variable "mongo_uri" {
+  description = "MongoDB connection string"
+  type        = string
+  sensitive   = true  # Never shown in logs/output
+}
+
+variable "gcp_region" {
+  description = "GCP region for resources"
+  type        = string
+  default     = "us-central1"
+}
+```
+
+```hcl
+# terraform.tfvars.example — committed template
+gcp_project = "your-project-id"
+gcp_region  = "us-central1"
+environment = "prod"
+# mongo_uri = "mongodb+srv://..." # Set via TF_VAR_mongo_uri or GitHub secret
+```
+
+### State Management
+
+```hcl
+# main.tf — remote backend
+terraform {
+  backend "gcs" {
+    bucket = "only-facts-tf-state"  # From GitHub Actions variable
+    prefix = "terraform/state"
+  }
+}
+```
+
+---
+
+## 6. CI/CD Practices
+
+### Workflow Structure
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Push to main, PRs | Lint, typecheck, test, build |
+| `terraform.yml` | Changes to `infra/**` | Validate, plan, apply |
+
+### Do
+- Use `actions/cache` for `node_modules` and Terraform plugins
+- Use Workload Identity Federation for GCP auth (no long-lived keys)
+- Run `terraform plan` on PRs, `terraform apply` only on main
+- Fail fast — no `continue-on-error` on quality gates
+- Use GitHub Actions secrets for sensitive values
+
+### Don't
+- Run `terraform apply` on pull requests
+- Store credentials in workflow files
+- Skip validation steps to "save time"
+- Use `latest` tags for actions — pin versions
+
+### Secrets Management
+
+| Secret Type | Where to Store | How to Access |
+|-------------|----------------|---------------|
+| GCP credentials | Workload Identity Federation | `google-github-actions/auth` |
+| MongoDB URI | GitHub Actions secret | `${{ secrets.MONGO_URI }}` |
+| Terraform state bucket | GitHub Actions variable | `${{ vars.TF_STATE_BUCKET }}` |
+| GCP Project ID | GitHub Actions variable | `${{ vars.GCP_PROJECT }}` |
+
+### Deployment Pattern
+
+```yaml
+# terraform.yml — plan on PR, apply on main
+on:
+  push:
+    branches: [main]
+    paths: ['infra/**']
+  pull_request:
+    paths: ['infra/**']
+
+jobs:
+  terraform:
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform fmt -check
+      - run: terraform plan -var-file=environments/prod.tfvars
+      
+      # Apply only on main branch
+      - if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -var-file=environments/prod.tfvars
+```
+
+---
+
 ## Quick Reference
 
 ```typescript

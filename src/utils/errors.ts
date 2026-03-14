@@ -21,3 +21,12 @@ export class ConfigurationError extends AppError {
     super(message, 500);
   }
 }
+
+/**
+ * Thrown when database connection fails.
+ */
+export class DatabaseConnectionError extends AppError {
+  constructor(message: string) {
+    super(message, 503);
+  }
+}

@@ -27,6 +27,7 @@ Deployment: Internal service, private VPC, port-forwarding access
 | `src/models/` | Mongoose models |
 | `src/services/` | Business logic |
 | `tests/` | Test files |
+| `infra/` | Terraform infrastructure-as-code (GCP/GKE) |
 | `docs/` | Project documentation |
 | `.claude/` | SDD framework files (DO NOT MODIFY) |
 
@@ -45,6 +46,9 @@ Deployment: Internal service, private VPC, port-forwarding access
 | Format (single file) | `npx prettier --write {file}` |
 | Type check | `npx tsc --noEmit` |
 | Run locally | `npm run dev` |
+| Terraform init | `cd infra && terraform init` |
+| Terraform validate | `cd infra && terraform validate` |
+| Terraform plan | `cd infra && terraform plan` |
 
 ## Tech Stack
 
@@ -55,6 +59,8 @@ Deployment: Internal service, private VPC, port-forwarding access
 - **Test framework:** Jest with ts-jest, Supertest
 - **Linting:** ESLint
 - **Formatting:** Prettier
+- **Infrastructure:** Terraform (GCP, GKE, Artifact Registry)
+- **CI/CD:** GitHub Actions (lint, test, build + terraform apply on main)
 
 ## Coding Conventions
 
@@ -71,6 +77,8 @@ Deployment: Internal service, private VPC, port-forwarding access
 - NEVER use callbacks for async operations — use async/await
 - NEVER access `process.env` directly outside config module
 - NEVER modify files in `.claude/` or `sdd-config.yaml` protected files
+- NEVER commit `.tfvars` files with secrets — use GitHub Actions secrets for sensitive values
+- NEVER hardcode GCP project IDs or credentials in Terraform — use variables + GitHub Actions secrets
 
 ## Agent-Specific Guidance
 
