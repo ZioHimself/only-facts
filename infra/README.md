@@ -235,3 +235,7 @@ gcloud iam service-accounts add-iam-policy-binding \
   --role="roles/iam.workloadIdentityUser" \
   --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/ZioHimself/only-facts"
 ```
+
+---
+
+*Last updated: Infrastructure includes MongoDB StatefulSet on GKE with auto-generated credentials.*

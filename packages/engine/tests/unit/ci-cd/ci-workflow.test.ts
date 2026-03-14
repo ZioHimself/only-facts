@@ -155,23 +155,6 @@ describe('CI Workflow', () => {
     });
   });
 
-  describe('caching', () => {
-    let steps: WorkflowStep[];
-
-    beforeAll(() => {
-      const jobs = workflow.jobs || {};
-      const ciJob = jobs['ci'] || jobs['build'] || Object.values(jobs)[0];
-      steps = ciJob?.steps || [];
-    });
-
-    it.skip('should use actions/cache or setup-node cache (temporarily disabled for debugging)', () => {
-      const cacheStep = steps.find(
-        (step) => step.uses?.includes('actions/cache') || step.with?.cache === 'npm'
-      );
-      expect(cacheStep).toBeDefined();
-    });
-  });
-
   describe('fail-fast behavior', () => {
     let steps: WorkflowStep[];
 

@@ -32,11 +32,6 @@ describe('CI Pipeline Local Simulation', () => {
       expect(result).toBeDefined();
     }, 60000);
 
-    it.skip('should run npm test successfully (skipped: recursive execution)', () => {
-      const result = execSync('npm test -- --passWithNoTests', execOptions);
-      expect(result).toBeDefined();
-    }, 120000);
-
     it('should run npm run build successfully', () => {
       const result = execSync('npm run build', execOptions);
       expect(result).toBeDefined();
