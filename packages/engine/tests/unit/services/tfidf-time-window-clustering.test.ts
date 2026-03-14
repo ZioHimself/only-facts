@@ -13,6 +13,8 @@ function makePost(
     account,
     content,
     language: 'English',
+    referencePostId: null,
+    isRetweet: null,
   };
 }
 

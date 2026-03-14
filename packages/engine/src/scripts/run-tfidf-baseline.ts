@@ -1,8 +1,13 @@
 import { connectDB, disconnectDB } from '../db/index.js';
 import { BaselineClusterModel } from '../models/baseline-cluster.js';
 import { TestPostModel } from '../models/test-post.js';
+import { buildCoordinationSignals } from '../services/coordination-signals.js';
 import { clusterByTfIdfTimeWindows } from '../services/tfidf-time-window-clustering.js';
-import type { BaselineClusteringPost, TfIdfTimeWindowConfig } from '../types/clustering.js';
+import type {
+  BaselineClusteringPost,
+  BaselineNarrativeCluster,
+  TfIdfTimeWindowConfig,
+} from '../types/clustering.js';
 
 interface CliOptions {
   readonly windowHours: number;
@@ -126,7 +131,15 @@ function toConfig(options: CliOptions): TfIdfTimeWindowConfig {
 async function fetchPosts(options: CliOptions): Promise<BaselineClusteringPost[]> {
   let query = TestPostModel.find(buildQuery(options))
     .sort({ date: 1 })
-    .select({ _id: 1, date: 1, account: 1, content: 1, 'metadata.language': 1 })
+    .select({
+      _id: 1,
+      date: 1,
+      account: 1,
+      content: 1,
+      referencePostId: 1,
+      'metadata.language': 1,
+      'metadata.isRetweet': 1,
+    })
     .lean();
 
   if (options.limit && options.limit > 0) {
@@ -140,13 +153,30 @@ async function fetchPosts(options: CliOptions): Promise<BaselineClusteringPost[]
     account: doc.account,
     content: doc.content,
     language: doc.metadata?.language ?? null,
+    referencePostId: doc.referencePostId ?? null,
+    isRetweet: doc.metadata?.isRetweet ?? null,
+  }));
+}
+
+function enrichClustersWithCoordination(
+  clusters: BaselineNarrativeCluster[],
+  posts: BaselineClusteringPost[]
+): BaselineNarrativeCluster[] {
+  const postsById = new Map<string, BaselineClusteringPost>();
+  for (const post of posts) {
+    postsById.set(post.id, post);
+  }
+
+  return clusters.map((cluster) => ({
+    ...cluster,
+    coordination: buildCoordinationSignals(cluster, postsById),
   }));
 }
 
 async function persistClusters(
   runId: string,
   config: TfIdfTimeWindowConfig,
-  clusters: ReturnType<typeof clusterByTfIdfTimeWindows>['clusters']
+  clusters: BaselineNarrativeCluster[]
 ): Promise<void> {
   await BaselineClusterModel.deleteMany({ runId });
   if (clusters.length === 0) {
@@ -164,6 +194,7 @@ async function persistClusters(
       accountIds: cluster.accountIds,
       topTerms: cluster.topTerms,
       centroidSize: cluster.centroidSize,
+      coordination: cluster.coordination,
       createdAt: new Date(),
     })),
     { ordered: false }
@@ -186,7 +217,8 @@ async function main(): Promise<void> {
 
     console.log(`Loaded ${posts.length} posts for clustering`);
     const result = clusterByTfIdfTimeWindows(posts, config);
-    await persistClusters(runId, config, result.clusters);
+    const enrichedClusters = enrichClustersWithCoordination(result.clusters, posts);
+    await persistClusters(runId, config, enrichedClusters);
 
     const summary = {
       runId,

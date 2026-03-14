@@ -52,5 +52,11 @@ Each run uses a unique `runId` and stores:
 - `postIds`
 - `accountIds`
 - top TF-IDF terms (`topTerms`)
+- coordination signals (`coordination.*`), including:
+  - account concentration
+  - retweet share
+  - synchronized burst metrics
+  - internal reference graph density
+  - composite `coordinationScore` and `flags`
 - clustering config snapshot
 

@@ -2,6 +2,7 @@ import type {
   BaselineClusteringPost,
   BaselineClusteringResult,
   BaselineNarrativeCluster,
+  CoordinationSignals,
   TfIdfTimeWindowConfig,
 } from '../types/clustering.js';
 
@@ -258,6 +259,21 @@ function clusterWithinWindow(
 }
 
 function toNarrativeCluster(cluster: WorkingCluster): BaselineNarrativeCluster {
+  const emptyCoordination: CoordinationSignals = {
+    postCount: cluster.postIds.length,
+    uniqueAccountCount: cluster.accountIds.size,
+    topAccountShare: 0,
+    accountConcentrationHhi: 0,
+    accountConcentrationNormalized: 0,
+    retweetShare: 0,
+    internalReferenceEdgeCount: 0,
+    referenceEdgeDensity: 0,
+    synchronizedBurstShare: 0,
+    synchronizedAccountsShare: 0,
+    coordinationScore: 0,
+    flags: [],
+  };
+
   return {
     clusterId: cluster.clusterId,
     windowStart: cluster.windowStart,
@@ -266,6 +282,7 @@ function toNarrativeCluster(cluster: WorkingCluster): BaselineNarrativeCluster {
     accountIds: [...cluster.accountIds],
     topTerms: cluster.topTerms,
     centroidSize: cluster.sumVector.size,
+    coordination: emptyCoordination,
   };
 }
 

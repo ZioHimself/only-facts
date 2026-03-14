@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
+import type { CoordinationSignals } from '../types/clustering.js';
 
 export interface BaselineCluster {
   _id: mongoose.Types.ObjectId;
@@ -17,6 +18,7 @@ export interface BaselineCluster {
   accountIds: string[];
   topTerms: string[];
   centroidSize: number;
+  coordination: CoordinationSignals;
   createdAt: Date;
 }
 
@@ -37,6 +39,20 @@ const baselineClusterSchema = new Schema<BaselineCluster>(
     accountIds: [{ type: String, required: true }],
     topTerms: [{ type: String, required: true }],
     centroidSize: { type: Number, required: true },
+    coordination: {
+      postCount: { type: Number, required: true },
+      uniqueAccountCount: { type: Number, required: true },
+      topAccountShare: { type: Number, required: true },
+      accountConcentrationHhi: { type: Number, required: true },
+      accountConcentrationNormalized: { type: Number, required: true },
+      retweetShare: { type: Number, required: true },
+      internalReferenceEdgeCount: { type: Number, required: true },
+      referenceEdgeDensity: { type: Number, required: true },
+      synchronizedBurstShare: { type: Number, required: true },
+      synchronizedAccountsShare: { type: Number, required: true },
+      coordinationScore: { type: Number, required: true, index: true },
+      flags: [{ type: String, required: true }],
+    },
     createdAt: { type: Date, required: true, default: Date.now },
   },
   {
