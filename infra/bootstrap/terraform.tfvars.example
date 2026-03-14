@@ -1,0 +1,7 @@
+# Bootstrap Configuration
+# Copy to terraform.tfvars and fill in your values
+
+gcp_project  = "your-gcp-project-id"
+gcp_region   = "europe-west1"
+github_owner = "ZioHimself"
+github_repo  = "only-facts"

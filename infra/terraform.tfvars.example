@@ -1,0 +1,26 @@
+# Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+
+# Required variables
+environment = "prod"
+gcp_project = "your-gcp-project-id"
+gcp_region  = "us-central1"
+
+# Application settings
+app_port = 3000
+
+# MongoDB settings
+# Set to true to deploy MongoDB on GKE (recommended for internal use)
+# Set to false to use external MongoDB (e.g., MongoDB Atlas)
+use_internal_mongodb = true
+mongodb_storage_size = "10Gi"
+
+# External MongoDB connection string (only needed if use_internal_mongodb = false)
+# mongo_uri = "mongodb+srv://..." # Set via TF_VAR_mongo_uri environment variable
+
+# GKE node pool settings
+gke_node_count_min = 1
+gke_node_count_max = 3
+use_preemptible    = true
+machine_type       = "e2-medium"
