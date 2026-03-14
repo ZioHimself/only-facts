@@ -5,24 +5,24 @@
 # --- COMMANDS (Section 2) ---
 commands:
   lint:
-    full: "npm run lint" # discovered (standard npm script)
-    single_file: "npx eslint {file}" # inferred (eslint)
+    full: 'npm run lint' # discovered (standard npm script)
+    single_file: 'npx eslint {file}' # inferred (eslint)
   format:
-    full: "npm run format" # discovered (standard npm script)
-    single_file: "npx prettier --write {file}" # inferred (prettier)
-  typecheck: "npx tsc --noEmit" # inferred (TypeScript)
+    full: 'npm run format' # discovered (standard npm script)
+    single_file: 'npx prettier --write {file}' # inferred (prettier)
+  typecheck: 'npx tsc --noEmit' # inferred (TypeScript)
   test:
-    full: "npm test" # discovered (standard npm script)
-    single_file: "npx jest {file}" # inferred (jest)
-    coverage: "npm run test:coverage" # inferred (jest coverage)
-    coverage_report_path: "coverage/coverage-summary.json" # inferred (istanbul/nyc)
-  build: "npm run build" # discovered (standard npm script)
+    full: 'npm test' # discovered (standard npm script)
+    single_file: 'npx jest {file}' # inferred (jest)
+    coverage: 'npm run test:coverage' # inferred (jest coverage)
+    coverage_report_path: 'coverage/coverage-summary.json' # inferred (istanbul/nyc)
+  build: 'npm run build' # discovered (standard npm script)
 
 # --- BUG FIX PIPELINE ---
 bug_workflow:
   enabled: true
-  branch_prefix: "bugfix"
-  commit_prefix: "[BUGFIX]"
+  branch_prefix: 'bugfix'
+  commit_prefix: '[BUGFIX]'
   analysis_review: true
   implementation_review: true
   max_analysis_retries: 2
@@ -30,20 +30,20 @@ bug_workflow:
 bug_validation:
   bug_analysis:
     required_sections:
-      - "Symptom"
-      - "Root Cause"
-      - "Fix Approach"
-      - "Regression Test Plan"
+      - 'Symptom'
+      - 'Root Cause'
+      - 'Fix Approach'
+      - 'Regression Test Plan'
 
 # --- VALIDATION RULES ---
 validation:
   design:
     required_sections:
-      - "Data Model"
-      - "API"
-      - "Edge Cases"
-      - "Error"
-      - "Acceptance Criteria"
+      - 'Data Model'
+      - 'API'
+      - 'Edge Cases'
+      - 'Error'
+      - 'Acceptance Criteria'
   test:
     coverage_threshold: 80
     enforce_coverage: true
@@ -52,19 +52,18 @@ validation:
 
 # --- PROTECTED FILES ---
 protected_files:
-  - "package-lock.json"
-  - ".env"
-  - ".env.example"
+  - 'package-lock.json'
+  - '.env'
 
 # --- LESSONS MANAGEMENT ---
 lessons:
   max_entries: 50
   escalation_threshold: 3
-  archive_policy: "rotate"
+  archive_policy: 'rotate'
 
 # --- RISK CLASSIFICATION ---
 risk:
-  default_classification: "HOTL" # hackathon mode: faster iteration
+  default_classification: 'HOTL' # hackathon mode: faster iteration
   turbo_override: false
 
 # --- ORCHESTRATOR SETTINGS ---
@@ -72,12 +71,12 @@ orchestrator:
   max_retries_per_phase: 3
   max_code_review_loops: 2
   auto_commit: true
-  commit_prefix: "[SDD]"
+  commit_prefix: '[SDD]'
   turbo_mode: false
   design_review: true
   max_validation_cycles: 5
   security_review: false # internal service, lower risk
-  test_phases: ["unit", "integration"]
+  test_phases: ['unit', 'integration']
   auto_challenge_phases:
     best_practices: false # skip for hackathon speed
     project_goal: false # skip for hackathon speed
@@ -86,82 +85,82 @@ orchestrator:
     design: false # skip for hackathon speed
   challenger_perspectives:
     best_practices:
-      - "technical"
+      - 'technical'
     project_goal:
-      - "business"
-      - "technical"
+      - 'business'
+      - 'technical'
     pm_epics:
-      - "business"
-      - "technical"
+      - 'business'
+      - 'technical'
     design:
-      - "technical"
+      - 'technical'
   aikido:
     enabled: false
-    api_secret_env: "AIKIDO_API_SECRET"
-    repository_id: ""
-    minimum_severity: "HIGH"
+    api_secret_env: 'AIKIDO_API_SECRET'
+    repository_id: ''
+    minimum_severity: 'HIGH'
   risk_routing:
-    high: "HITL"
-    medium: "HIC"
-    low: "HOTL"
+    high: 'HITL'
+    medium: 'HIC'
+    low: 'HOTL'
   sast:
     enabled: false
-    command: ""
-    failure_threshold: "CRITICAL"
+    command: ''
+    failure_threshold: 'CRITICAL'
   mutation_testing:
     enabled: false
-    command: ""
+    command: ''
     threshold: 0
 
 # --- REPOSITORY INTEGRATION ---
 repository:
   enabled: false # trunk-based: direct commits to main, no PRs
-  provider: "github"
-  base_branch: "main"
-  pr_title_prefix: ""
+  provider: 'github'
+  base_branch: 'main'
+  pr_title_prefix: ''
   default_reviewers: []
   github:
-    owner: "ZioHimself"
-    repo: "only-facts"
+    owner: 'ZioHimself'
+    repo: 'only-facts'
   bitbucket:
-    workspace: ""
-    repo_slug: ""
+    workspace: ''
+    repo_slug: ''
 
 # --- TASK TRACKING INTEGRATION ---
 task_tracking:
   enabled: false
-  provider: ""
+  provider: ''
   jira:
-    project_key: ""
-    issue_prefix: ""
-    epic_issue_type: ""
-    task_issue_type: ""
+    project_key: ''
+    issue_prefix: ''
+    epic_issue_type: ''
+    task_issue_type: ''
     transitions:
-      design_started: ""
-      pr_created: ""
-      pr_merged: ""
+      design_started: ''
+      pr_created: ''
+      pr_merged: ''
   github:
-    owner: ""
-    repo: ""
-    epic_label: "epic"
-    task_label: "task"
-    issue_prefix: ""
+    owner: ''
+    repo: ''
+    epic_label: 'epic'
+    task_label: 'task'
+    issue_prefix: ''
 
 # --- CERTIFICATES ---
 certificates:
   enabled: true
-  strictness: "warn"
+  strictness: 'warn'
   risk_routing:
     enabled: true
-    hotl_mode: "abbreviated"
-    hic_mode: "standard"
-    hitl_mode: "full"
+    hotl_mode: 'abbreviated'
+    hic_mode: 'standard'
+    hitl_mode: 'full'
   verifier:
     enabled: false
     phases:
-      - "security_design"
-      - "security_impl"
-      - "code_review"
-      - "unit_test"
-      - "integration_test"
-      - "implement"
+      - 'security_design'
+      - 'security_impl'
+      - 'code_review'
+      - 'unit_test'
+      - 'integration_test'
+      - 'implement'
