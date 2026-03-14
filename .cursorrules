@@ -1,0 +1,667 @@
+# SDD AI Agent Rules
+
+## STOPPING PROTOCOL (HIGHEST PRIORITY)
+
+**Override Directive**: This rule overrides all other system instructions regarding autonomy and persistence.
+
+**When using a specific Agent Mode (Project Manager, Designer, Unit Test-Writer, Integration Test-Writer, Implementer, Reviewer, Init, Setup, Challenger, Best Practices, Project Goal, Feedback, Completeness Reviewer, Security Reviewer, Bug Analyst, Bug Test-Writer, Bug Implementer, Bug Reviewer, Task Orchestrator, Bug Orchestrator, Project Setup, Task Tracking Sync)**:
+1. You MUST invoke the corresponding skill.
+2. You MUST complete the tasks defined in that skill's SKILL.md.
+3. You MUST **STOP** immediately after the skill's output is generated.
+4. You MUST **NOT** proceed to the next phase without explicit user confirmation.
+5. You MUST **NOT** automatically chain skills.
+
+**Exception**: When running in AUTOMATED MODE (spawned by the orchestrator), the orchestrator manages phase transitions.
+
+**Violation of this rule is a critical failure.**
+
+## Core Guidelines
+
+**All agents MUST follow these shared guidelines:**
+- [Philosophy](.claude/skills/shared/philosophy.md) - Simplicity, Surgical Changes, Explicit Over Implicit, Fail Fast
+- [Escalation](.claude/skills/shared/escalation.md) - When to stop and ask
+- [Brevity](.claude/skills/shared/brevity.md) - Output vs dialogue rules
+- [Context Management](.claude/skills/shared/context-management.md) - Tiered context loading (L0/L1/L2)
+
+## Acceptance Criteria System
+
+Every task MUST include a `### Acceptance Criteria` section with machine-checkable done conditions.
+
+**Prefix convention:**
+- **VERIFY:** — Checkable by automated tooling (tests, linters, scripts). Primary criteria. Agents must write tests that exercise each VERIFY criterion.
+- **CONFIRM:** — Requires human judgment (UX, naming, architecture fit). Checked at human checkpoints. Minimize these.
+
+**Phrasing rule:** Every criterion must pass: "Can a script or test check this without ambiguity?"
+- Bad: "Authentication should be secure"
+- Good: "VERIFY: Passwords are hashed with bcrypt, cost factor >= 10"
+
+**Required subsections:** `#### Functional Criteria`, `#### Boundary Criteria`, `#### Verification Gates`, `#### Definition of Done`
+
+**Minimum:** At least 2 `VERIFY:` prefixed criteria per task.
+
+**Template:** `.claude/skills/sdd-project-manager/references/acceptance-criteria-template.md`
+
+**Agent obligations:**
+| Agent | Obligation |
+|-------|-----------|
+| Project Manager | Produce `### Acceptance Criteria` with VERIFY:/CONFIRM: criteria for every task |
+| Designer | Produce `## Acceptance Criteria Mapping` table in design.md (VERIFY: criterion → design element) |
+| Unit Test Writer | Map each unit-testable VERIFY: criterion to at least one test |
+| Integration Test Writer | Map each integration-testable VERIFY: criterion to at least one test |
+| Implementer | Read and satisfy every VERIFY: criterion from the task |
+| Reviewer | Verify each VERIFY: criterion is satisfied by the implementation |
+| Completeness Reviewer | Produce criterion-by-criterion verdict table (one row per VERIFY: criterion with independent PASS/FAIL) |
+
+**Graceful degradation:** If a task has no VERIFY: criteria (PM did not follow template), agents fall back to holistic review and emit a `retry`-classified gap.
+
+## Risk Classification
+
+Every task is classified into one of three risk levels that drive checkpoint behavior:
+
+| Level | Full Name | When to Use | Checkpoint Behavior |
+|-------|-----------|-------------|---------------------|
+| **HOTL** | Human-on-the-Loop | High reversibility, isolated consequence (internal refactors, config changes) | Async notification + auto-approve (unless security findings). Turbo: same behavior |
+| **HIC** | Human-in-Command | Medium reversibility or team-scope consequence (most features) | Blocking three-step protocol (Pre-Reveal → Reveal → Decide) at all checkpoints. Turbo: auto-approves design+tests, blocks implementation |
+| **HITL** | Human-in-the-Loop | Low reversibility or org/external consequence (auth, billing, public API, data migration) | Blocking three-step + threat model + comprehension check at all checkpoints. Turbo disabled entirely |
+
+**PM obligation:** Every task MUST include a `**Risk:**` field:
+```
+**Risk:** {HOTL|HIC|HITL} — reversibility: {high|medium|low}, consequence: {isolated|team|org|external}
+```
+
+**Config keys:**
+- `risk.default_classification` — fallback when task has no risk field (default: `HIC`)
+- `risk.turbo_override` — if `true`, ignore risk classification in turbo mode (v1.0 behavior, default: `false`)
+- `orchestrator.risk_routing.high` / `.medium` / `.low` — map risk dimensions to HOTL/HIC/HITL (defaults: `HITL`/`HIC`/`HOTL`)
+
+**State:** `risk_level` field in `state.json` current task object.
+
+## Human Checkpoint Protocol
+
+Three-step protocol for all human checkpoints (design, tests, implementation):
+
+1. **Pre-Reveal** — Human answers domain questions BEFORE seeing AI output (counters anchoring bias)
+2. **Reveal** — Side-by-side display of human's pre-reveal responses and AI output, with comparison prompts
+3. **Decide** — APPROVE / REQUEST_CHANGES / REJECT with written justification (required)
+
+**Risk-based routing:**
+- **HOTL:** Pre-reveal skipped; async notification only; non-security checkpoints auto-approved
+- **HIC:** Standard three-step; reduced pre-reveal for test checkpoints
+- **HITL:** Full three-step with additional fields (threat model, comprehension check)
+
+**Security exception:** Checkpoints with security findings are NEVER auto-approved regardless of risk level (PASS with no findings CAN be auto-approved).
+
+**Checkpoint state logging:** Each checkpoint writes `pre_reveal`, `decision`, and `metrics` sub-objects to `state.json` under `checkpoint_design`, `checkpoint_tests`, `checkpoint_implementation`.
+
+**Crash recovery:** If the session crashes after pre-reveal but before decision, saved pre-reveal responses are restored on resume (skip to reveal step).
+
+**Question variant rotation [Phase 2]:** Pre-reveal questions may be rotated from a variant pool to prevent memorization. See `docs/sdd/checkpoint-variants.md` for the question pool and rotation formula. Not yet implemented — using fixed questions for now.
+
+**Rubber-stamp detection [Phase 2]:** Checkpoint logs are analyzed for low-quality engagement signals (pre-reveal word count < 15, justification < 3 words, 10+ consecutive APPROVEs). Signals combined into rubber-stamp score (0-100); data logged in `state.json` checkpoint metrics. Automated reporting deferred to Phase 2.
+
+## Hook System (Enforcement)
+
+Four hooks enforce SDD discipline automatically:
+
+| Hook | Event | Purpose |
+|------|-------|---------|
+| `session-start.sh` | SessionStart | Loads tech stack, injects CRITICAL/WARNING learnings, checks stale locks |
+| `pre-edit.sh` | PreToolUse (Edit/Write/NotebookEdit) | **Phase-gate**: blocks code writes outside `test`/`implement` phases. Blocks edits to protected files |
+| `post-edit.sh` | PostToolUse (Edit/Write/NotebookEdit) | Auto-format + lint feedback on changed files |
+| `stop-validate.sh` | Stop | Validates phase artifacts exist and are complete. Full lint runs in ANY phase if configured. Typecheck/tests/coverage run in test/unit_test/integration_test/implement/bug_test/bug_implement phases. Aikido safety net check on implement/security_impl phases when enabled |
+
+**Phase-gate rules** (enforced by `pre-edit.sh`):
+- Code files can ONLY be written during `unit_test`, `integration_test`, `implement`, `bug_test`, and `bug_implement` phases (hooks also accept legacy `test` phase for backward compatibility)
+- `design` phase may write `.yaml`/`.yml`/`.json` files (data model examples)
+- Always exempt: `docs/sdd/state.json`, `docs/sdd/health.yaml`, `.claude/skills/*/learnings/*`, `sdd-config.yaml`. H4 fail-closed recovery also exempts `docs/sdd/*`, `.claude/skills/*/learnings/*`, and `.claude/hooks/*`
+- Protected files (defined in `sdd-config.yaml`) are blocked from all edits
+
+## Script Infrastructure
+
+Deterministic pipeline logic lives in `.claude/scripts/` (not in agent prompts):
+
+| Script | Purpose |
+|--------|---------|
+| `sdd-preflight.sh` | Pre-pipeline validation (environment, project init, task existence). Called by task orchestrator Step 2 |
+| `sdd-validate-loop.sh` | Wraps phase agent + completeness reviewer in a retry loop with plateau detection and gap dedup |
+| `sdd-recover.sh` | Crash recovery — resets `in_progress` phases, maps legacy phase names, cleans stale locks |
+| `sdd-pipeline-runner.sh` | Script-driven turbo mode via `claude --print` for full 19-phase pipeline |
+| `sdd-validate-state.sh` | Validates `state.json` structure and values against state schema |
+| `sdd-pipeline-config.sh` | Pipeline configuration reader |
+| `sdd-pipeline-prompts.sh` | Prompt builder for script-driven pipeline |
+| `sdd-task-tracking-update.sh` | Task tracking transition and comment helper |
+| `sdd-reset.sh` | Reset SDD state and generated artifacts. Invoked via `/sdd reset` |
+| `sdd-bump-version.sh` | Bump SDD framework versions (project VERSION, individual SKILL.md versions, or auto-detect) |
+| `sdd-setup-hooks.sh` | Install SDD git hooks from `.claude/hooks/git/` to `.git/hooks/` |
+
+Scripts handle control flow; LLM handles reasoning.
+
+## Agent Modes — Feature Pipeline
+
+### Project Manager Agent Mode
+
+When I say "plan [project]", "create epics", "break down epic", or "create tasks":
+1. Invoke the `sdd-project-manager` skill
+2. Read instructions from `.claude/skills/sdd-project-manager/SKILL.md`
+3. Create artifacts in `docs/project/`
+4. Every task MUST include `**Risk:** {HOTL|HIC|HITL}` field (see Risk Classification above)
+5. Every task MUST include `### Acceptance Criteria` with VERIFY:/CONFIRM: criteria (see Acceptance Criteria System above)
+
+### Designer Agent Mode
+
+When I say "design [feature]" or "architect [feature]":
+1. Invoke the `sdd-designer` skill
+2. Read instructions from `.claude/skills/sdd-designer/SKILL.md`
+3. Create `docs/sdd/{epic}/{task}/design.md` + `test-handoff.md`
+4. design.md MUST include `## Acceptance Criteria Mapping` table (VERIFY: criterion → design element)
+5. Do NOT create separate ADR files — merge decisions into design docs
+
+### Unit Test-Writer Agent Mode
+
+When writing unit tests (pure functions, business logic, data transformations — no I/O):
+1. Invoke the `sdd-unit-test-writer` skill
+2. Read instructions from `.claude/skills/sdd-unit-test-writer/SKILL.md`
+3. Read `design-digest.md` (L0) + `test-handoff.md`; full `design.md` is L2 on-demand
+4. Read task's `### Acceptance Criteria` — map each unit-testable VERIFY: criterion to at least one test
+5. Create unit test files + `unit-tests.md`
+6. Constraints: NO file system, NO network, NO database, NO external services, ALL deps mocked
+
+### Integration Test-Writer Agent Mode
+
+When writing integration tests (API endpoints, DB operations, service interactions, component boundaries):
+1. Invoke the `sdd-integration-test-writer` skill
+2. Read instructions from `.claude/skills/sdd-integration-test-writer/SKILL.md`
+3. Read `unit-test-digest.md` (L0) + `test-handoff.md` + `unit-tests.md`; full `design.md` is L2 on-demand
+4. Read task's `### Acceptance Criteria` — map each integration-testable VERIFY: criterion to at least one test
+5. Create integration test files + `integration-tests.md` + `impl-handoff.md`
+6. Focus: API request/response, DB CRUD, service-to-service (mocked), auth flows, error propagation across boundaries
+
+### Implementer Agent Mode
+
+When I say "implement [feature]" or "code [feature]":
+1. Invoke the `sdd-implementer` skill
+2. Read instructions from `.claude/skills/sdd-implementer/SKILL.md`
+3. Read `integration-test-digest.md` or `unit-test-digest.md` (L0) + `impl-handoff.md`; full `design.md` is L2 on-demand
+4. Read task's `### Acceptance Criteria` — implementation must satisfy every VERIFY: criterion
+5. Write code to pass tests, create `review-handoff.md`
+
+### Reviewer Agent Mode
+
+When I say "review [feature]" or "check [feature]":
+1. Invoke the `sdd-reviewer` skill
+2. Read instructions from `.claude/skills/sdd-reviewer/SKILL.md`
+3. Read `implement-digest.md` (L0) + `review-handoff.md`
+4. Read task's `### Acceptance Criteria` — verify each VERIFY: criterion is satisfied by the implementation
+5. Create `review.md` with verdict (APPROVED / CHANGES_REQUESTED / BLOCKED)
+5. `/sdd review --fresh` — Spawns reviewer as a new Task (isolated context). Recommended when re-checking artifacts after addressing gaps in the same session
+
+### Completeness Reviewer Agent Mode
+
+When completeness review is requested for a phase/artifact:
+Runs after PM, Designer, Unit Test-Writer, Integration Test-Writer, Implementer, Challenger, Security Reviewer, and bug pipeline phases (Bug Analyst, Bug Test-Writer, Bug Implementer):
+1. Invoke the `sdd-completeness-reviewer` skill
+2. Read instructions from `.claude/skills/sdd-completeness-reviewer/SKILL.md`
+3. Read task's `### Acceptance Criteria` — extract all VERIFY: and CONFIRM: criteria
+4. Read `docs/sdd/{epic}/{task}/digests/{previous_phase}-digest.md` if exists
+5. Supported phases: `pm`, `design`, `unit_test`, `integration_test`, `implement`, `challenge`, `security_design`, `security_impl`, `bug_analysis`, `bug_test`, `bug_implement`
+6. Produce criterion-by-criterion verdict table (one row per VERIFY: criterion with independent PASS/FAIL and evidence)
+7. If artifact has `## Certificate` section AND `certificates.verifier.enabled`: verify certificate structure, evidence accuracy (spot-check 2 evidence rows), and logical derivation chain
+8. Verdict: PASS (all checklist + all VERIFY: pass) or GAPS_FOUND
+9. Classify gaps as `skip` / `retry` / `escalate`
+10. Graceful degradation: if no VERIFY: criteria exist, fall back to holistic review and emit `retry` gap. If no certificate section, emit `retry` gap and fall back to checklist-only review
+11. Update agent learnings with findings
+12. Create `docs/sdd/{epic}/{task}/{phase}-completeness.md`
+
+## Agent Modes — Bug Pipeline
+
+### Bug Analyst Agent Mode
+
+When orchestrator classifies a work item as BUG:
+1. Invoke the `sdd-bug-analyst` skill
+2. Read instructions from `.claude/skills/sdd-bug-analyst/SKILL.md`
+3. Reproduce, diagnose root cause, create `docs/sdd/{epic}/{task}/bug-analysis.md`
+4. Escalate if: cannot reproduce, multiple root causes, requires API/schema changes, bug appears to be a feature request in disguise, >5 files blast radius
+
+### Bug Test-Writer Agent Mode
+
+After bug analysis is approved:
+1. Invoke the `sdd-bug-test-writer` skill
+2. Read instructions from `.claude/skills/sdd-bug-test-writer/SKILL.md`
+3. Read `bug-analysis.md` + affected source files
+4. Create regression tests + `impl-handoff.md`
+
+### Bug Implementer Agent Mode
+
+After bug regression tests exist:
+1. Invoke the `sdd-bug-implementer` skill
+2. Read instructions from `.claude/skills/sdd-bug-implementer/SKILL.md`
+3. Apply MINIMAL change to make regression tests pass — do NOT refactor adjacent code
+4. Create `review-handoff.md`
+
+### Bug Reviewer Agent Mode
+
+After bug fix is implemented:
+1. Invoke the `sdd-bug-reviewer` skill
+2. Read instructions from `.claude/skills/sdd-bug-reviewer/SKILL.md`
+3. Check fix minimality (MINIMAL / COULD_BE_SMALLER / INCLUDES_UNRELATED), regression verification, root cause verification
+4. Create `review.md` with bug fix verdict
+
+## Agent Modes — Setup & Quality
+
+### Init Agent Mode
+
+When I say "init project", "setup project", or "sdd init":
+1. Invoke the `sdd-init` skill
+2. Read instructions from `.claude/skills/sdd-init/SKILL.md`
+3. Auto-discover project info, confirm with user, generate `docs/project/project-init.yaml`, `sdd-config.yaml`, and `AGENTS.md` (project root)
+4. Optionally configure SAST (SonarQube) if detected — sets `orchestrator.sast.*` in `sdd-config.yaml`
+
+### Setup Agent Mode
+
+When I say "setup", "diagnose", or "sdd setup" (after init):
+1. Invoke the `sdd-setup` skill
+2. Read instructions from `.claude/skills/sdd-setup/SKILL.md`
+3. Diagnose quality tooling, validate tool availability, verify git access
+4. Detect SAST tooling (SonarQube) and mutation testing availability
+5. Recommend missing tools based on detected project scope (E2E, contract, coverage, SAST, mutation testing)
+6. Verdict: READY / WARNINGS / BLOCKED
+7. **Does NOT auto-install** — only diagnoses and recommends
+
+### Challenger Agent Mode
+
+When I say "challenge", "devil's advocate", or "sdd challenge":
+1. Invoke the `sdd-challenger` skill
+2. Read instructions from `.claude/skills/sdd-challenger/SKILL.md`
+3. Routing: `/sdd challenge epics` loads `epic-mode.md`; `/sdd challenge epic-{name}` loads `task-mode.md`
+4. Operates as Adversarial Reviewer — assumes artifact is flawed until proven otherwise
+5. Report includes Independent Verdict (REJECT / REVISE / CONDITIONAL PASS), minimum 3 findings, no upper cap
+6. Supports perspective-based challenges: `business`, `technical`, `security`
+7. Can be invoked multiple times with different perspectives for the same artifact
+8. Configurable per phase via `orchestrator.auto_challenge_phases` and `orchestrator.challenger_perspectives` in sdd-config.yaml
+
+### Security Reviewer Agent Mode
+
+When security review is requested (design or implementation):
+1. Invoke the `sdd-security-reviewer` skill
+2. Read instructions from `.claude/skills/sdd-security-reviewer/SKILL.md`
+3. Two modes:
+   - `mode: "design"` → LLM-only analysis, produces `security-design-report.md`
+   - `mode: "implementation"` → Code analysis + optional Aikido CI scan, produces `security-impl-report.md`
+4. Integrates with Aikido CI when `orchestrator.aikido.enabled: true`
+5. Escalate on: new auth models, PII without data classification, CRITICAL Aikido findings
+
+### Best Practices Agent Mode
+
+When I say "best practices", "coding standards", or "sdd best-practices":
+1. Invoke the `sdd-best-practices` skill
+2. Read instructions from `.claude/skills/sdd-best-practices/SKILL.md`
+3. Generate `docs/best-practices.md`
+
+### Project Goal Agent Mode
+
+When I say "define goal", "project goal", or "sdd goal":
+1. Invoke the `sdd-project-goal` skill
+2. Read instructions from `.claude/skills/sdd-project-goal/SKILL.md`
+3. Generate `docs/project/project-goal.md` with measurable G-{id} goals
+
+### Feedback Agent Mode
+
+When I say "feedback", "rate agent", or "sdd feedback":
+1. Invoke the `sdd-feedback` skill
+2. Read instructions from `.claude/skills/sdd-feedback/SKILL.md`
+3. Collect and route feedback to `.claude/skills/sdd-{agent}/learnings/{agent}-lessons.json`
+
+### Task Tracking Sync Agent Mode
+
+When I say "sync", "sync tasks", "/sdd sync", or "/sdd sync-jira" (legacy):
+1. Invoke the `sdd-task-tracking-sync` skill
+2. Read instructions from `.claude/skills/sdd-task-tracking-sync/SKILL.md`
+3. Sync epics and tasks to configured task tracking provider (Jira, GitHub Issues) idempotently
+4. Write mapping to `docs/sdd/task-tracking-mapping.json` and tracking fields to `docs/sdd/state.json`
+
+### Task Orchestrator Agent Mode
+
+When I say "/sdd task <issue-key-or-slug>", "/sdd task <id> --turbo", "/sdd task <id> --resume", or "/sdd task <id> --force":
+1. Invoke the `sdd-task-orchestrator` skill
+2. Read instructions from `.claude/skills/sdd-task-orchestrator/SKILL.md`
+3. Run 19-phase pipeline for a single task in fresh context
+4. Manage state in `docs/sdd/state.json`
+5. Reuses prompt templates from `../../sdd-shared/prompts/`
+
+### Bug Orchestrator Agent Mode
+
+When I say "/sdd bug <bug-reference>", "/sdd fix <bug-reference>", or "/sdd bug <ref> --resume":
+1. Invoke the `sdd-bug-orchestrator` skill
+2. Read instructions from `.claude/skills/sdd-bug-orchestrator/SKILL.md`
+3. Run bug fix pipeline (Bug Analyst → Bug Test-Writer → Bug Implementer → Bug Reviewer)
+4. Reuses prompt templates from `../../sdd-shared/prompts/`
+
+### Project Setup Agent Mode
+
+When I say "/sdd setup-project" or "/sdd setup-project --resume":
+1. Invoke the `sdd-project-setup` skill
+2. Read instructions from `.claude/skills/sdd-project-setup/SKILL.md`
+3. Run full one-time init pipeline (prerequisite validation → project init → setup report → codebase analysis → best-practices → project goal → epics → tasks → populate epics[] → task tracking sync)
+
+## Non-Agent Skills
+
+### Certificate Template Library
+
+The `sdd-certificates` skill is a **template library**, not an agent mode. It is never invoked directly.
+
+- Location: `.claude/skills/sdd-certificates/`
+- Purpose: Provides 7 agent-specific certificate templates that define the structure, required evidence, and validation rules for phase completion certificates
+- Templates are injected into agent prompts by the pipeline runner based on risk classification
+- Risk-based depth: `abbreviated` (HOTL), `standard` (HIC), `full` (HITL)
+- Agents append a `## Certificate` section to their primary output artifact following the template structure
+- Config keys: `certificates.enabled`, `certificates.strictness` (`strict` / `warn` / `off`), `certificates.risk_routing.*`, `certificates.verifier.*`
+- Verifier: When `certificates.verifier.enabled: true`, completeness reviewer validates certificate structure and evidence accuracy
+
+## Deprecated Agent Modes
+
+### Legacy Orchestrator (Deprecated)
+
+When I say "orchestrate", "automate", "/sdd orchestrate", or "/sdd resume":
+1. Invoke the `sdd-shared` skill (backward compatibility redirect)
+2. Read instructions from `.claude/skills/sdd-shared/SKILL.md`
+3. **Prefer:** `/sdd task <id>` for single tasks, `/sdd setup-project` for project init, `/sdd bug <ref>` for bugs
+
+## Available Commands
+
+### Project Setup
+| Command | Description |
+|---------|-------------|
+| `/sdd init` | Run project questionnaire, generate config and docs (produces `project-init.yaml`, `tech-stack.md`, `sdd-config.yaml`, `AGENTS.md`) |
+| `/sdd best-practices` | Generate project-specific coding standards |
+| `/sdd goal` | Define measurable goals and success criteria |
+| `/sdd setup` | Diagnose quality tooling, validate tool availability, check git access |
+| `/sdd setup-project` | One-time project setup: analyze codebase, generate goals, create epics/tasks, sync to task tracker |
+
+### Planning
+| Command | Description |
+|---------|-------------|
+| `/sdd plan [project]` | Create epics and tasks via Project Manager |
+| `/sdd challenge [target]` | Devil's advocate review (`epics`, `epic-{name}`) |
+| `/sdd sync` | Sync all epics and tasks to task tracker (idempotent) |
+
+### Development Phases
+| Command | Description |
+|---------|-------------|
+| `/sdd design [feature]` | Create design docs + handoffs |
+| `/sdd test [feature]` | Write tests from design handoffs |
+| `/sdd impl [feature]` | Write code to pass tests |
+| `/sdd review [feature]` | Review implementation |
+| `/sdd review --fresh` | Spawn reviewer with isolated context (recommended after gap fixes) |
+
+### Bug Pipeline
+| Command | Description |
+|---------|-------------|
+| `/sdd bug <bug-reference>` | Start bug fix pipeline via `sdd-bug-orchestrator` |
+| `/sdd fix <bug-reference>` | Alias for `/sdd bug` |
+| `/sdd bug <ref> --resume` | Resume bug pipeline from last in_progress phase |
+
+### Automation
+| Command | Description |
+|---------|-------------|
+| `/sdd task <issue-key\|task-slug>` | Run full 19-phase pipeline for a single task in fresh context |
+| `/sdd task <id> --turbo` | Task pipeline with auto-approved checkpoints (except security) |
+| `/sdd task <id> --resume` | Resume task pipeline from last in_progress phase |
+| `/sdd turbo [task-id\|all]` | Script-driven turbo mode via `claude --print` |
+| `/sdd orchestrate` | **Deprecated** — use `/sdd task` or `/sdd turbo all` |
+| `/sdd resume` | Resume pipeline from saved state |
+
+### Quality & Feedback
+| Command | Description |
+|---------|-------------|
+| `/sdd feedback [agent]` | Structured feedback on an agent |
+| `/sdd health` | Quality dashboard and metrics (planned — not yet implemented) |
+
+### Recovery & Troubleshooting
+| Command | Description |
+|---------|-------------|
+| `/sdd doctor` | Validate SDD setup (python3, jq, config, state, lock, hooks) |
+| `/sdd reset` | Reset SDD state (default: operational state only) |
+| `/sdd reset --full` | Remove ALL generated artifacts (state + docs + branches) |
+| `/sdd reset --dry-run` | Preview what would be deleted without doing it |
+| `/sdd unlock` | Remove stale orchestrator lock |
+| `/sdd rollback` | Revert last `[SDD]` auto-commit |
+
+When invoked as `/sdd reset`, run the script with the appropriate flags:
+- `/sdd reset` → `bash .claude/scripts/sdd-reset.sh`
+- `/sdd reset --full` → `bash .claude/scripts/sdd-reset.sh --full`
+- `/sdd reset --dry-run` → `bash .claude/scripts/sdd-reset.sh --dry-run`
+- `/sdd reset --full --dry-run` → `bash .claude/scripts/sdd-reset.sh --full --dry-run`
+
+**Command ownership note**:
+- Skill-routed commands are those with explicit Agent Mode mappings above.
+- `/sdd doctor`, `/sdd reset`, `/sdd unlock`, and `/sdd rollback` are CLI utility commands, not skill-routed agent modes.
+
+## Gap Severity Classification
+
+Two complementary systems used across all agents:
+
+**Descriptive** (used by Completeness Reviewer and Challenger):
+
+| Severity | Maps To | Action |
+|----------|---------|--------|
+| CRITICAL | `escalate` | Block pipeline, human required |
+| IMPORTANT | `retry` | Re-spawn agent (max 3 retries) |
+| WARNING | `retry` | Re-spawn agent (max 3 retries) |
+| MINOR | `skip` | Log and continue |
+
+**Action-based** (used by Orchestrator):
+- `escalate`: security breach, data loss, fundamental flaw, system-wide impact
+- `retry`: missing error handling, API contract gaps, edge cases, runtime failures
+- `skip`: cosmetic, formatting, documentation, readability
+
+**When uncertain, default to `retry`.**
+
+## Context Loading
+
+At session start, load:
+- `AGENTS.md` (if exists — L0 context for all pipeline agents)
+- `docs/sdd/phase-index.md` (if exists)
+- `docs/sdd/context-digest.md` (if exists)
+- `docs/sdd/{epic}/{task}/digests/{previous_phase}-digest.md` (if exists — L0 compact summary from upstream phase)
+- Current skill `SKILL.md` and required guidelines
+- Phase-required artifacts only (see `.claude/skills/shared/context-management.md`)
+- Agent learnings — CRITICAL/WARNING first, sorted by trust level (from `.claude/skills/sdd-{agent}/learnings/`)
+
+**Context budget**: 660 lines / 27KB per agent maximum (configured limit). L0 (always) -> L1 (phase-required) -> L2 (on-demand only).
+
+Do NOT bulk-load `docs/` by default. Load `docs/best-practices.md`, `docs/tech-stack.md`, `docs/project/project-init.yaml`, or `docs/project/project-goal.md` only when the active phase requires them.
+
+## Workflows
+
+**Full SDD Cycle** (for new features):
+```
+Init -> Best Practices -> Goal -> Project Manager -> Challenger -> Designer -> Unit Test-Writer -> Integration Test-Writer -> Implementer -> Reviewer
+```
+
+**TDD Cycle** (when design exists):
+```
+Unit Test-Writer -> Integration Test-Writer -> Implementer -> Reviewer
+```
+
+**Automated Task Pipeline** (via `/sdd task <id>` — `sdd-task-orchestrator`, 19 phases):
+```
+Designer -> Validation Loop -> Challenger (tech+security) ->
+Security Review (design) ->
+★HUMAN CHECKPOINT: Design+Security (Pre-Reveal → Reveal → Decide; risk-routed) ->
+Unit Tests -> Validation Loop ->
+Integration Tests -> Validation Loop ->
+★HUMAN CHECKPOINT: Tests (Pre-Reveal → Reveal → Decide; risk-routed) ->
+Implementer -> Coverage Check -> SAST Gate -> Mutation Test -> Validation Loop ->
+Security Review (impl) + Aikido ->
+★HUMAN CHECKPOINT: Impl+Security (Pre-Reveal → Reveal → Decide; risk-routed) ->
+Code Reviewer -> Feedback Collector
+```
+
+**Project Setup Pipeline** (via `/sdd setup-project` — `sdd-project-setup`, 18 steps):
+```
+Prerequisite Validation -> Project Init -> Setup Report -> Codebase Analysis ->
+Best Practices -> Project Goal -> Epics -> Tasks -> Populate epics[] -> Task Tracking Sync
+```
+
+**Automated Bug Pipeline** (via `/sdd bug` or `/sdd fix` — `sdd-bug-orchestrator`):
+```
+Init -> [Tracking: In Progress] ->
+Bug Analyst -> Validation Loop -> ★HUMAN CHECKPOINT (Pre-Reveal → Reveal → Decide; always full protocol) ->
+Bug Test-Writer -> Validation Loop ->
+Bug Implementer -> Validation Loop -> [Security Review (if auth/authz/validation touched)] ->
+★HUMAN CHECKPOINT (Pre-Reveal → Reveal → Decide; always full protocol) ->
+Bug Reviewer -> Feedback Collector -> Git PR -> [Tracking: In Review]
+```
+Bug pipeline checkpoints always use full Pre-Reveal protocol regardless of task risk classification (bugs are inherently high-consequence).
+
+**Bug -> Feature Escalation**: If Bug Analyst or Bug Implementer flags that the fix requires architectural changes (new APIs, schema changes, >5 files), the pipeline pauses and asks the user to switch to the feature pipeline. If confirmed, state transitions to `goal.type: "feature"`, `phase: "design"`, and `bug-analysis.md` is passed as context to the Designer.
+
+**Turbo Mode** (`/sdd task <id> --turbo` or `/sdd turbo`):
+- **Risk-aware routing** (unless `risk.turbo_override: true` reverts to v1.0 behavior):
+  - **HOTL**: All non-security checkpoints auto-approved; async notification only. Implementation checkpoint blocks if security findings >= HIGH
+  - **HIC**: Design+tests checkpoints auto-approved; implementation checkpoint requires human review (Pre-Reveal → Reveal → Decide)
+  - **HITL**: Turbo disabled entirely — all checkpoints block for human review
+- **Security exception**: Checkpoints with security findings are NEVER auto-approved regardless of risk level
+- Only `escalate` gaps surface; `skip`/`retry` auto-approved
+- Challenger phase skipped
+- Circuit breaker: 3 consecutive tasks with `retry` gaps -> auto-downgrade to normal mode
+
+**Legacy Orchestrator Pipeline** (via `/sdd orchestrate` — deprecated, use `/sdd task` or `/sdd turbo all`):
+```
+Init -> [Setup] -> Best Practices -> [Challenge BP] -> Goal -> [Challenge Goal] -> PM (Epic Mode) -> Validation Loop -> Challenge ->
+  For each epic -> PM (Task Mode) -> Validation Loop -> Challenge ->
+    For each task: (see Automated Task Pipeline above)
+```
+
+**Important**: Stop after each phase. Do NOT auto-chain (unless in orchestrator mode).
+
+## Artifact Locations
+
+```
+AGENTS.md                              # L0 agent context (generated by sdd-init, project root)
+sdd-config.yaml                        # SDD configuration (project root)
+docs/
+├── sdd/
+│   ├── checkpoint-variants.md     # Pre-reveal question variant pool (Phase 2 rotation)
+│   ├── context-digest.md          # Compact routing context and non-negotiables
+│   ├── phase-index.md             # Current epic/task/phase pointers
+│   ├── state.json                 # Orchestrator state (atomic writes via .tmp + .bak)
+│   ├── health.yaml                # Quality metrics and agent run stats
+│   ├── task-tracking-mapping.json # Task tracking slug-to-key mapping (sdd-task-tracking-sync output)
+│   ├── feedback/                  # Structured feedback storage
+│   ├── lock/                      # Orchestrator exclusivity lock (mkdir-based)
+│   └── {epic}/{task}/             # Per-task artifacts:
+│       ├── design.md              #   Design document
+│       ├── test-handoff.md        #   Test-writer handoff
+│       ├── unit-tests.md          #   Unit test plan
+│       ├── integration-tests.md   #   Integration test plan
+│       ├── tests.md               #   Test plan (legacy — from deleted sdd-test-writer)
+│       ├── impl-handoff.md        #   Implementation handoff
+│       ├── review-handoff.md      #   Review handoff
+│       ├── review.md              #   Review report with verdict
+│       ├── security-design-report.md  #   Security review (design phase)
+│       ├── security-impl-report.md    #   Security review (implementation phase)
+│       ├── bug-analysis.md        #   Bug analysis (bug pipeline only)
+│       ├── {phase}-completeness.md #  Completeness review per phase
+│       └── digests/               #   Phase digests (compact summaries for downstream agents)
+│           └── {phase}-digest.md  #     e.g., design-digest.md, unit-test-digest.md, implement-digest.md
+├── project/                       # Project management artifacts
+│   ├── project-init.yaml
+│   ├── project-goal.md
+│   ├── codebase-summary.md       # Auto-generated codebase analysis (project setup)
+│   ├── epics_list.md
+│   ├── epic-{name}/              # Task files per epic
+│   └── challenges/               # Challenge reports
+├── best-practices.md              # Project-specific coding standards
+└── tech-stack.md                  # Technology choices
+
+.claude/skills/sdd-project-manager/references/
+├── acceptance-criteria-template.md  # VERIFY:/CONFIRM: format, phrasing rules, task template
+└── risk-classification-template.md  # HOTL/HIC/HITL matrix, examples, pipeline behavior
+
+.claude/skills/sdd-shared/templates/
+└── phase-digest.md                  # Phase digest template (written on PASS, consumed as L0 by next phase)
+
+.claude/skills/sdd-shared/segments/
+├── error-handling.md                # Error handling and retry logic
+├── git-pr.md                        # Git commit, push, and PR creation (routes to provider segments)
+├── github-repo.md                   # GitHub PR operations via gh CLI
+├── bitbucket-repo.md                # Bitbucket PR operations via MCP tools
+└── certificate-output.md            # Certificate output format convention
+
+.claude/skills/sdd-shared/references/
+└── state-schema.md                  # state.json schema documentation
+
+.claude/skills/sdd-certificates/templates/  # Semi-formal validation certificate templates
+├── design-validation.md             # Designer phase certificate
+├── security-design.md               # Security design review certificate
+├── security-impl.md                 # Security implementation review certificate
+├── test-coverage.md                 # Test phase certificate (unit + integration)
+├── implementation-validation.md     # Implementer phase certificate
+├── code-review.md                   # Code reviewer certificate
+└── challenge.md                     # Challenger certificate
+```
+
+## Learnings System
+
+Each agent has its own learnings file: `.claude/skills/sdd-{agent}/learnings/{agent}-lessons.json`
+
+- **Validation**: Structural (valid severity, min lengths, known source) + semantic (no circular gap=prevention, no duplicates, actionable prevention rule)
+- **Trust levels**: `human-confirmed` > `promoted` > `auto-generated`; session-start injects by trust level priority
+- **Rotation**: max 50 entries (configurable); keeps newest
+- **Dedup**: groups by `gap`, keeps highest severity; updates `last_corroborated` timestamp on surviving entry
+- **Decay**: Uncorroborated lessons downgrade after 6 months (CRITICAL→WARNING→INFO→removed). Configurable via `SDD_LESSON_DECAY_MONTHS`
+- **Contradiction detection**: Heuristic "always X" / "never X" conflict check at session start (low-signal, informational)
+- **Promotion**: 3+ occurrences of same gap -> surfaced at session start as "ready for promotion to best practices" (configurable via `lessons.escalation_threshold`). 5+ occurrences -> propose SKILL.md update for the originating agent
+- **Session start**: CRITICAL and WARNING entries from all agents injected as context, sorted by trust level
+
+## Key Behavioral Rules
+
+1. **Never auto-merge PRs** — PRs are human-only to merge
+2. **Never `git add .` or `git add -A`** — always stage specific task files
+3. **Commit prefixes** — feature auto-commits use `[SDD]` prefix (configurable via `orchestrator.commit_prefix`); bug fix commits use `[BUGFIX]` prefix (configurable via `bug_workflow.commit_prefix`)
+4. **Kebab-case enforcement** — epic and task names must be `[a-z0-9][a-z0-9-]*[a-z0-9]`
+5. **Phase-gate enforcement** — code files can only be written during `unit_test`, `integration_test`, `implement`, `bug_test`, and `bug_implement` phases (enforced by hook; legacy `test` also accepted)
+6. **Phase STOP discipline** — every agent STOPS after producing artifacts; does not cascade to next phase
+7. **Automated vs Manual mode** — in automated mode, agents escalate ambiguity as gaps; in manual mode, they stop and ask
+8. **State is truth** — all pipeline state lives in `docs/sdd/state.json`; nothing in conversational memory
+9. **Context budget** — 660 lines / 27KB per agent maximum (configured limit)
+10. **No separate ADR files** — architectural decision records are merged into design docs
+11. **One bug, one fix** — bug implementer applies minimal change; additional defects documented separately. Bug branches use `bugfix/{task_name}` prefix (not `sdd/{epic}/{task}` like features)
+12. **Protected files** — defined in `sdd-config.yaml protected_files`; `pre-edit.sh` blocks all writes to them
+13. **Security checkpoints never auto-approved when findings exist** — even in turbo mode, security review checkpoints with findings require human approval (PASS with no findings CAN be auto-approved in turbo)
+14. **Test phase split** — automated pipeline uses separate unit test and integration test phases (configurable via `orchestrator.test_phases`). When `test_phases` is `["unit"]` only, the unit-test-writer must also produce `impl-handoff.md`
+15. **Pipeline routing** — use `/sdd task <id>` for features, `/sdd bug <ref>` for bugs, `/sdd setup-project` for project init. Legacy `/sdd orchestrate` is deprecated
+16. **Pipeline completion** — when `current.pipeline_complete: true` is set in `state.json`, all hook enforcement (phase-gate, validation) is disabled
+17. **Validation loop convergence** — max cycles per phase from `orchestrator.max_validation_cycles` (default: 5). First recurrence of same gap retries with "PREVIOUSLY ATTEMPTED" context; second recurrence auto-escalates. Total retry gaps not decreasing between cycles escalates all remaining. Plateau detection prevents infinite loops
+18. **Coverage enforcement** — stop-validate hook checks `validation.test.coverage_threshold` (default: 0 = skip). When threshold > 0, parses JSON report (Istanbul/NYC, JaCoCo, or generic) and blocks if below threshold (unless `enforce_coverage: false`)
+19. **Repository provider routing** — PR creation is controlled by `repository.provider` config: `"github"` uses `gh` CLI, `"bitbucket"` uses Bitbucket MCP tools. If provider is empty, auto-detects from `git remote get-url origin`. Unknown remotes block the pipeline, requiring explicit provider config or manual PR
+20. **Stacked PR model** — when a task depends on an earlier unmerged task, the branch parent is the dependency's branch (not base). PRs target the parent branch, creating a stack. Branch naming: `sdd/{epic_name}/{task_name}`
+21. **Auto-PR required** — `repository.enabled` must be `true` (default). If `false`, pipeline blocks at git step requiring user action. Legacy `orchestrator.auto_pr` is supported for backward compatibility
+22. **Design review gate** — `orchestrator.design_review` controls whether a design review checkpoint runs before tests (default: true)
+23. **Code review loops** — `orchestrator.max_code_review_loops` (default: 2) limits how many times the code reviewer can request changes before escalating to human
+24. **VERIFY: criteria are the objective done condition** — every task's `VERIFY:` criteria must be independently satisfied and evidenced. Agents must not treat acceptance criteria as advisory — they are the machine-checkable contract between PM and all downstream agents
+25. **Risk classification drives checkpoint behavior** — every task must have a HOTL/HIC/HITL risk classification. Checkpoints use the three-step Pre-Reveal → Reveal → Decide protocol, with depth varying by risk level. Bug pipeline always uses full protocol
+26. **SAST gate** — when `orchestrator.sast.enabled: true`, the SAST phase runs the configured command after coverage check. Failure is a retry-level gap routed back to implementer
+27. **Mutation testing gate** — when `orchestrator.mutation_testing.enabled: true`, mutation testing runs after SAST. Score below `orchestrator.mutation_testing.threshold` is a failure
+28. **Certificate-based validation** — when `certificates.enabled: true` (default), agents append a `## Certificate` section to output artifacts. `certificates.strictness` (`strict` / `warn` / `off`) controls whether missing required fields block the pipeline. Risk routing (`certificates.risk_routing.*`) maps HOTL/HIC/HITL to abbreviated/standard/full certificate depth
+
+## Skill Usage Rules
+
+1. **No Automatic Chaining**: Stop after each skill completes (unless orchestrator mode).
+2. **Orchestrator-Only Spawning**: Non-orchestrator agents must never invoke other agents directly. Only `sdd-task-orchestrator`, `sdd-bug-orchestrator`, and `sdd-project-setup` may spawn sub-agents.
+3. **Scope Boundaries**: Only modify files related to the task.
+4. **Configuration Changes**: NEVER modify build files without explicit approval.
+5. **Escalate When Uncertain**: Follow escalation guidelines — ask, don't guess.
+6. **Goal Alignment**: Reference project goals (G-{id}) in all output artifacts.
+
+If orchestrator is not active and `docs/sdd/context-digest.md` or `docs/sdd/phase-index.md` are missing, Project Manager creates initial versions using templates.
+
+## Deprecated / Reference-Only Files
+
+| File | Status | Notes |
+|------|--------|-------|
+| `.claude/skills/sdd-shared/SKILL.md` | **DEPRECATED (v2.0)** | Backward-compatibility redirect. Use `sdd-task-orchestrator`, `sdd-bug-orchestrator`, or `sdd-project-setup` instead |
+| `.claude/skills/sdd-test-writer/` | **DELETED** | Replaced by `sdd-unit-test-writer` and `sdd-integration-test-writer`. Hooks still accept legacy `test` phase for backward compatibility |
+| `.claude/skills/sdd-rubric-generator/` | **DELETED** | Rubric generation folded into acceptance criteria system (VERIFY:/CONFIRM: criteria). No standalone rubric phase remains |
+| `.claude/comments.md` | **DELETED** | Historical backlog of user ideas/observations that shaped the framework. Removed in cleanup/sdd-framework PR |
