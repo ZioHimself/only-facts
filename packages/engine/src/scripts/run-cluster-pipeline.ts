@@ -76,7 +76,11 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   return {
-    windowHours: parseNumberFlag(args.get('--window-hours'), DEFAULT_OPTIONS.windowHours, '--window-hours'),
+    windowHours: parseNumberFlag(
+      args.get('--window-hours'),
+      DEFAULT_OPTIONS.windowHours,
+      '--window-hours'
+    ),
     similarityThreshold: parseNumberFlag(
       args.get('--similarity-threshold'),
       DEFAULT_OPTIONS.similarityThreshold,
@@ -346,13 +350,13 @@ async function main(): Promise<void> {
       .sort({ 'botBehavior.botLikelihoodScore': -1, 'coordination.postCount': -1 })
       .limit(options.topN)
       .select({ clusterId: 1, topTerms: 1, coordination: 1, botBehavior: 1 })
-      .lean()) as ClusterForReport[];
+      .lean()) as unknown as ClusterForReport[];
 
     const [topOrganicCluster] = (await BaselineClusterModel.find(reportQuery)
       .sort({ 'botBehavior.botLikelihoodScore': 1, 'coordination.postCount': -1 })
       .limit(options.topN)
       .select({ clusterId: 1, topTerms: 1, coordination: 1, botBehavior: 1 })
-      .lean()) as ClusterForReport[];
+      .lean()) as unknown as ClusterForReport[];
 
     console.log(
       JSON.stringify(

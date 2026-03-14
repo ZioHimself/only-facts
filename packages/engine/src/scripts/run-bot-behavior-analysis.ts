@@ -32,10 +32,10 @@ async function resolveRunId(explicitRunId: string | null): Promise<string | null
   if (explicitRunId) {
     return explicitRunId;
   }
-  const latest = await BaselineClusterModel.findOne({})
+  const latest = (await BaselineClusterModel.findOne({})
     .sort({ createdAt: -1 })
     .select({ runId: 1 })
-    .lean();
+    .lean()) as { runId?: string } | null;
   return latest?.runId ?? null;
 }
 
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
       .map((postId) => toObjectId(postId))
       .filter((postId): postId is mongoose.Types.ObjectId => postId !== null);
 
-    const posts = await TestPostModel.find({ _id: { $in: objectIds } })
+    const posts = (await TestPostModel.find({ _id: { $in: objectIds } })
       .select({
         _id: 1,
         date: 1,
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
         'metadata.following': 1,
         'metadata.updates': 1,
       })
-      .lean();
+      .lean()) as unknown as Parameters<typeof toPostMap>[0];
     const postsById = toPostMap(posts);
 
     const operations = clusters.map((cluster) => ({

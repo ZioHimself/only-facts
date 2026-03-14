@@ -30,12 +30,12 @@ async function resolveRunId(explicitRunId: string | null): Promise<string | null
   if (explicitRunId) {
     return explicitRunId;
   }
-  const latest = await BaselineClusterModel.findOne({
+  const latest = (await BaselineClusterModel.findOne({
     botBehavior: { $ne: null },
   })
     .sort({ createdAt: -1 })
     .select({ runId: 1 })
-    .lean();
+    .lean()) as { runId?: string } | null;
   return latest?.runId ?? null;
 }
 
@@ -55,7 +55,23 @@ async function main(): Promise<void> {
       botBehavior: { $ne: null },
     };
 
-    const topBot = await BaselineClusterModel.find(baseQuery)
+    type ClusterResult = {
+      clusterId: string;
+      topTerms: string[];
+      coordination: {
+        postCount: number;
+        uniqueAccountCount: number;
+        coordinationScore: number;
+      };
+      botBehavior: {
+        botLikelihoodScore: number;
+        suspectedBotAccountShare: number;
+        suspectedBotPostShare: number;
+        flags: string[];
+      };
+    };
+
+    const topBot = (await BaselineClusterModel.find(baseQuery)
       .sort({
         'botBehavior.botLikelihoodScore': -1,
         'coordination.postCount': -1,
@@ -67,9 +83,9 @@ async function main(): Promise<void> {
         coordination: 1,
         botBehavior: 1,
       })
-      .lean();
+      .lean()) as unknown as ClusterResult[];
 
-    const topOrganic = await BaselineClusterModel.find(baseQuery)
+    const topOrganic = (await BaselineClusterModel.find(baseQuery)
       .sort({
         'botBehavior.botLikelihoodScore': 1,
         'coordination.postCount': -1,
@@ -81,25 +97,9 @@ async function main(): Promise<void> {
         coordination: 1,
         botBehavior: 1,
       })
-      .lean();
+      .lean()) as unknown as ClusterResult[];
 
-    const normalize = (
-      clusters: Array<{
-        clusterId: string;
-        topTerms: string[];
-        coordination: {
-          postCount: number;
-          uniqueAccountCount: number;
-          coordinationScore: number;
-        };
-        botBehavior: {
-          botLikelihoodScore: number;
-          suspectedBotAccountShare: number;
-          suspectedBotPostShare: number;
-          flags: string[];
-        };
-      }>
-    ) =>
+    const normalize = (clusters: ClusterResult[]) =>
       clusters.map((cluster) => ({
         clusterId: cluster.clusterId,
         postCount: cluster.coordination.postCount,
