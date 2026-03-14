@@ -5,20 +5,32 @@
 
 import { app } from './app.js';
 import { config } from './config/index.js';
+import { connectDB, disconnectDB } from './db/index.js';
 
-const server = app.listen(config.port, () => {
-  console.log(`Server running on port ${config.port}`);
-});
+let server: ReturnType<typeof app.listen>;
+
+/**
+ * Starts the application: connects to DB, then starts HTTP server.
+ */
+async function start(): Promise<void> {
+  await connectDB();
+  console.log('Connected to MongoDB');
+
+  server = app.listen(config.port, () => {
+    console.log(`Server running on port ${config.port}`);
+  });
+}
 
 /**
  * Graceful shutdown handler.
- * Stops accepting new connections and waits for existing ones to complete.
+ * Stops accepting new connections, disconnects DB, then exits.
  */
-function shutdown(): void {
+async function shutdown(): Promise<void> {
   console.log('Shutting down gracefully...');
 
-  server.close(() => {
-    console.log('Server closed');
+  server.close(async () => {
+    await disconnectDB();
+    console.log('Server and database closed');
     process.exit(0);
   });
 
@@ -28,5 +40,10 @@ function shutdown(): void {
   }, 10000);
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on('SIGTERM', () => void shutdown());
+process.on('SIGINT', () => void shutdown());
+
+start().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
+});

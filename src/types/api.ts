@@ -26,4 +26,7 @@ export interface ApiError {
  */
 export interface HealthData {
   status: 'ok' | 'degraded';
+  db?: {
+    connected: boolean;
+  };
 }

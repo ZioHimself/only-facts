@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ApiResponse, HealthData } from '../types/api.js';
+import { getConnectionStatus } from '../db/index.js';
 
 /**
  * Health check router.
@@ -8,10 +9,15 @@ import type { ApiResponse, HealthData } from '../types/api.js';
 export const healthRouter = Router();
 
 healthRouter.get('/', (req, res) => {
+  const dbStatus = getConnectionStatus();
+
   const response: ApiResponse<HealthData> = {
     success: true,
     data: {
-      status: 'ok',
+      status: dbStatus.connected ? 'ok' : 'degraded',
+      db: {
+        connected: dbStatus.connected,
+      },
     },
   };
 
