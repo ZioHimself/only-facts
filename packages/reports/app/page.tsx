@@ -13,6 +13,7 @@ import {
   filters,
   summarySegments,
   type DataColumnData,
+  type SummarySegmentData,
 } from '@/app/data/dashboardData';
 import styles from '@/app/styles/dashboard.module.css';
 
@@ -151,6 +152,33 @@ interface CohortComparison {
   readonly reach: number;
   readonly engagementRate: number;
   readonly riskScore: number;
+}
+
+interface ClusterReportResponse {
+  readonly ok: boolean;
+  readonly runId?: string;
+  readonly database?: string;
+  readonly lastUpdate?: string;
+  readonly summarySegments?: SummarySegmentData[];
+  readonly columns?: DataColumnData[];
+  readonly error?: string;
+}
+
+interface AnalysisRunSummary {
+  readonly runId: string;
+  readonly status: string;
+  readonly startedAt: string;
+  readonly completedAt: string | null;
+  readonly postsProcessed: number | null;
+  readonly postsClustered: number | null;
+  readonly clusters: number | null;
+  readonly region: string | null;
+}
+
+interface AnalysisRunsResponse {
+  readonly ok: boolean;
+  readonly runs?: AnalysisRunSummary[];
+  readonly error?: string;
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -777,6 +805,13 @@ export default function Home() {
   );
   const [mongoLoading, setMongoLoading] = useState<boolean>(false);
 
+  // Live cluster data state
+  const [liveData, setLiveData] = useState<ClusterReportResponse | null>(null);
+  const [liveDataLoading, setLiveDataLoading] = useState<boolean>(false);
+  const [liveDataError, setLiveDataError] = useState<string>('');
+  const [analysisRuns, setAnalysisRuns] = useState<AnalysisRunSummary[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string>('');
+
   const projectFactor = useMemo<number>(() => {
     if (selectedProject === 'Cross-Border Influence Monitoring') {
       return 0.88;
@@ -853,25 +888,59 @@ export default function Home() {
     if (mockDataEnabled) {
       return dynamicSummary;
     }
+    // Use live data if available
+    if (liveData?.ok && liveData.summarySegments) {
+      return liveData.summarySegments;
+    }
+    // Show loading state
+    if (liveDataLoading) {
+      return summarySegments.map((segment) => ({
+        ...segment,
+        value: 'Loading...',
+      }));
+    }
+    // Show error or offline state
+    if (liveDataError) {
+      return summarySegments.map((segment) => ({
+        ...segment,
+        value: segment.label === 'TOPICS' ? liveDataError : '--',
+      }));
+    }
     return summarySegments.map((segment) => {
       if (segment.label === 'TOPICS') {
         return { ...segment, value: 'No data source' };
       }
       return { ...segment, value: 'OFFLINE' };
     });
-  }, [dynamicSummary, mockDataEnabled]);
+  }, [dynamicSummary, liveData, liveDataError, liveDataLoading, mockDataEnabled]);
 
-  const effectiveColumns = useMemo(
-    () => (mockDataEnabled ? dynamicColumns : toOfflineColumns(columns)),
-    [dynamicColumns, mockDataEnabled]
-  );
+  const effectiveColumns = useMemo(() => {
+    if (mockDataEnabled) {
+      return dynamicColumns;
+    }
+    // Use live data if available
+    if (liveData?.ok && liveData.columns) {
+      return liveData.columns;
+    }
+    // Show loading or offline state
+    return toOfflineColumns(columns);
+  }, [dynamicColumns, liveData, mockDataEnabled]);
 
   const dataSourceDisplay = useMemo<string>(() => {
     if (mockDataEnabled) {
       return 'MOCK DATA ACTIVE: mock-data.yaml';
     }
     if (dataSourceType === 'db_url') {
-      return `DB URL: ${dbUrl}`;
+      if (liveDataLoading) {
+        return 'DB: Loading cluster report...';
+      }
+      if (liveData?.ok && liveData.runId) {
+        return `DB: ${liveData.runId.slice(0, 30)}...`;
+      }
+      if (liveDataError) {
+        return `DB: ${liveDataError.slice(0, 40)}`;
+      }
+      return 'DB: Connecting...';
     }
     if (dataSourceType === 'api') {
       return `API: ${apiUrl}`;
@@ -880,7 +949,16 @@ export default function Home() {
       return `JSON: ${jsonFileName || 'no file selected'}`;
     }
     return `YAML: ${yamlFileName || 'no file selected'}`;
-  }, [apiUrl, dataSourceType, dbUrl, jsonFileName, mockDataEnabled, yamlFileName]);
+  }, [
+    apiUrl,
+    dataSourceType,
+    jsonFileName,
+    liveData,
+    liveDataError,
+    liveDataLoading,
+    mockDataEnabled,
+    yamlFileName,
+  ]);
 
   const mockDataYaml = useMemo(
     () =>
@@ -1002,6 +1080,83 @@ export default function Home() {
     }
   };
 
+  // Fetch analysis runs list when DB mode is enabled
+  useEffect(() => {
+    if (mockDataEnabled || dataSourceType !== 'db_url') {
+      return;
+    }
+
+    const fetchAnalysisRuns = async () => {
+      try {
+        const response = await fetch('/api/analysis-runs');
+        const payload = (await response.json()) as AnalysisRunsResponse;
+        if (payload.ok && payload.runs) {
+          setAnalysisRuns(payload.runs);
+          // Auto-select the first completed run if none selected
+          if (!selectedRunId && payload.runs.length > 0) {
+            const completedRun = payload.runs.find((r) => r.status === 'completed');
+            if (completedRun) {
+              setSelectedRunId(completedRun.runId);
+            }
+          }
+        }
+      } catch {
+        setAnalysisRuns([]);
+      }
+    };
+
+    fetchAnalysisRuns();
+  }, [dataSourceType, mockDataEnabled, selectedRunId]);
+
+  // Fetch cluster report data when DB mode is enabled
+  useEffect(() => {
+    if (mockDataEnabled || dataSourceType !== 'db_url') {
+      setLiveData(null);
+      setLiveDataError('');
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchClusterReport = async () => {
+      setLiveDataLoading(true);
+      setLiveDataError('');
+      try {
+        const params = new URLSearchParams();
+        if (selectedRunId) {
+          params.set('runId', selectedRunId);
+        }
+        const url = `/api/cluster-report${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await fetch(url);
+        const payload = (await response.json()) as ClusterReportResponse;
+        if (!cancelled) {
+          if (payload.ok) {
+            setLiveData(payload);
+            setLiveDataError('');
+          } else {
+            setLiveData(null);
+            setLiveDataError(payload.error ?? 'Failed to load cluster report');
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLiveData(null);
+          setLiveDataError(error instanceof Error ? error.message : 'Unknown error');
+        }
+      } finally {
+        if (!cancelled) {
+          setLiveDataLoading(false);
+        }
+      }
+    };
+
+    fetchClusterReport();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSourceType, mockDataEnabled, selectedRunId]);
+
   useEffect(() => {
     if (!isServerLogsOpen && activeView !== 'reports') {
       return;
@@ -1079,24 +1234,53 @@ export default function Home() {
           <div className={styles.contentArea}>
             <header className={styles.topBar}>
               <div className={styles.filterRow}>
-                <FilterGroup
-                  label="PROJECT"
-                  value={selectedProject}
-                  options={filterOptions.projects}
-                  onChange={setSelectedProject}
-                />
-                <FilterGroup
-                  label="PLATFORM"
-                  value={selectedPlatform}
-                  options={filterOptions.platforms}
-                  onChange={setSelectedPlatform}
-                />
-                <FilterGroup
-                  label="NARRATIVE"
-                  value={selectedNarrative}
-                  options={filterOptions.narratives}
-                  onChange={setSelectedNarrative}
-                />
+                {mockDataEnabled ? (
+                  <>
+                    <FilterGroup
+                      label="PROJECT"
+                      value={selectedProject}
+                      options={filterOptions.projects}
+                      onChange={setSelectedProject}
+                    />
+                    <FilterGroup
+                      label="PLATFORM"
+                      value={selectedPlatform}
+                      options={filterOptions.platforms}
+                      onChange={setSelectedPlatform}
+                    />
+                    <FilterGroup
+                      label="NARRATIVE"
+                      value={selectedNarrative}
+                      options={filterOptions.narratives}
+                      onChange={setSelectedNarrative}
+                    />
+                  </>
+                ) : dataSourceType === 'db_url' && analysisRuns.length > 0 ? (
+                  <FilterGroup
+                    label="ANALYSIS RUN"
+                    value={selectedRunId || analysisRuns[0]?.runId || ''}
+                    options={analysisRuns.map((run) => {
+                      const date = run.completedAt
+                        ? new Date(run.completedAt).toLocaleDateString()
+                        : 'running';
+                      const posts = run.postsClustered
+                        ? `${run.postsClustered.toLocaleString()} posts`
+                        : '';
+                      return `${run.runId.slice(9, 28)} (${date}${posts ? `, ${posts}` : ''})`;
+                    })}
+                    onChange={(displayValue) => {
+                      const runIdPrefix = displayValue.split(' ')[0];
+                      const matchingRun = analysisRuns.find((r) => r.runId.includes(runIdPrefix));
+                      if (matchingRun) {
+                        setSelectedRunId(matchingRun.runId);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className={styles.sourcePill}>
+                    {liveDataLoading ? 'Loading runs...' : 'No analysis runs available'}
+                  </div>
+                )}
               </div>
               <div className={styles.sourcePill}>{dataSourceDisplay}</div>
             </header>
