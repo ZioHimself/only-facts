@@ -17,6 +17,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/packages/reports/.next/standalone ./
 COPY --from=builder /app/packages/reports/.next/static ./packages/reports/.next/static
