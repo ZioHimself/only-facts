@@ -102,7 +102,6 @@ jobs:
             -n only-facts
 
       - name: Deploy Reports to GKE
-        continue-on-error: true
         run: |
           kubectl set image deployment/only-facts-reports \
             only-facts-reports=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/only-facts/reports:${{ github.sha }} \

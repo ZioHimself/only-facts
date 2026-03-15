@@ -15,9 +15,15 @@ variable "gcp_region" {
 }
 
 variable "app_port" {
-  description = "Application container port"
+  description = "Engine application container port"
   type        = number
   default     = 3000
+}
+
+variable "reports_port" {
+  description = "Reports application container port"
+  type        = number
+  default     = 3001
 }
 
 variable "mongo_uri" {

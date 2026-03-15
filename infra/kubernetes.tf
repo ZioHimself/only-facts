@@ -205,3 +205,121 @@ resource "kubernetes_ingress_v1" "only_facts" {
     }
   }
 }
+
+resource "kubernetes_deployment" "only_facts_reports" {
+  metadata {
+    name      = "only-facts-reports"
+    namespace = kubernetes_namespace.only_facts.metadata[0].name
+
+    labels = {
+      app         = "only-facts-reports"
+      environment = var.environment
+    }
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "only-facts-reports"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app         = "only-facts-reports"
+          environment = var.environment
+        }
+
+        annotations = {
+          "cluster-autoscaler.kubernetes.io/safe-to-evict" = "true"
+        }
+      }
+
+      spec {
+        service_account_name = kubernetes_service_account.only_facts.metadata[0].name
+
+        container {
+          name  = "only-facts-reports"
+          image = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project}/only-facts/reports:latest"
+
+          port {
+            container_port = var.reports_port
+            protocol       = "TCP"
+          }
+
+          env {
+            name  = "PORT"
+            value = tostring(var.reports_port)
+          }
+
+          env {
+            name  = "NODE_ENV"
+            value = "production"
+          }
+
+          env {
+            name  = "ENGINE_API_URL"
+            value = "http://only-facts.only-facts.svc.cluster.local"
+          }
+
+          resources {
+            requests = {
+              cpu    = "100m"
+              memory = "256Mi"
+            }
+            limits = {
+              cpu    = "500m"
+              memory = "512Mi"
+            }
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/api/health"
+              port = var.reports_port
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 10
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/api/health"
+              port = var.reports_port
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 5
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "only_facts_reports" {
+  metadata {
+    name      = "only-facts-reports"
+    namespace = kubernetes_namespace.only_facts.metadata[0].name
+
+    annotations = {
+      "cloud.google.com/load-balancer-type" = "Internal"
+    }
+  }
+
+  spec {
+    selector = {
+      app = "only-facts-reports"
+    }
+
+    port {
+      port        = 80
+      target_port = var.reports_port
+      protocol    = "TCP"
+    }
+
+    type = "LoadBalancer"
+  }
+}
