@@ -52,7 +52,7 @@ jobs:
           TF_VAR_mongo_uri: ${{ secrets.MONGO_URI || '' }}
 
       - name: Terraform Apply
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: terraform apply -auto-approve -var-file=environments/prod.tfvars
         env:
           TF_VAR_gcp_project: ${{ vars.GCP_PROJECT }}
