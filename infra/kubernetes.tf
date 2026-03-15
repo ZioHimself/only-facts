@@ -1,3 +1,15 @@
+# Import blocks for resources created before state was recorded (timeout recovery)
+# These can be removed after one successful terraform apply
+import {
+  to = kubernetes_deployment.only_facts_reports
+  id = "only-facts/only-facts-reports"
+}
+
+import {
+  to = kubernetes_service.only_facts_reports
+  id = "only-facts/only-facts-reports"
+}
+
 locals {
   mongodb_internal_uri = "mongodb://only-facts:${random_password.mongodb_app.result}@mongodb-internal.mongodb.svc.cluster.local:27017/only-facts"
   mongodb_uri          = var.use_internal_mongodb ? local.mongodb_internal_uri : var.mongo_uri
