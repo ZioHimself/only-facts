@@ -1,5 +1,5 @@
 """
-Download the last week of the Bittensor Subnet 13 X dataset using DuckDB.
+Download the last week of the Bittensor Subnet 13 X dataset james-1111/x_dataset_0304209 (https://huggingface.co/datasets/james-1111/x_dataset_0304209) using DuckDB.
 Processes one remote parquet file at a time to stay under rate limits
 and keep memory usage low.
 """

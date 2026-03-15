@@ -51,6 +51,64 @@ function parseOptionalBoolean(value) {
   return null;
 }
 
+function extractStatusId(value) {
+  const raw = normalizeString(value);
+  if (!raw) {
+    return null;
+  }
+
+  // Accept direct numeric IDs as-is.
+  if (/^\d{8,}$/.test(raw)) {
+    return raw;
+  }
+
+  const statusMatch = raw.match(/\/status\/(\d{8,})/i);
+  if (statusMatch) {
+    return statusMatch[1];
+  }
+
+  const queryMatch = raw.match(/[?&](?:status_id|tweet_id|id)=(\d{8,})/i);
+  if (queryMatch) {
+    return queryMatch[1];
+  }
+
+  return null;
+}
+
+function maybeDecodeBase64(value) {
+  const raw = normalizeString(value);
+  if (!raw || raw.length % 4 !== 0 || !/^[A-Za-z0-9+/=_-]+$/.test(raw)) {
+    return "";
+  }
+
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  try {
+    const decoded = Buffer.from(normalized, "base64").toString("utf8").trim();
+    // Keep only text that resembles URL-like content.
+    if (decoded.includes("http") || decoded.includes("/status/") || decoded.includes("status_id=")) {
+      return decoded;
+    }
+  } catch {
+    // Ignore decode errors and fall back to direct parsing.
+  }
+
+  return "";
+}
+
+function extractReferencePostId(value) {
+  const direct = extractStatusId(value);
+  if (direct) {
+    return direct;
+  }
+
+  const decoded = maybeDecodeBase64(value);
+  if (!decoded) {
+    return null;
+  }
+
+  return extractStatusId(decoded);
+}
+
 const args = getScriptArgs();
 
 if (args.length < 6) {
@@ -97,7 +155,7 @@ sourceCollection.find({}).forEach((rawDoc) => {
   const date = parseDate(rawDoc[dateField]);
   const account = normalizeString(rawDoc[accountField]);
   const content = normalizeString(rawDoc[contentField]);
-  const referenceRaw = normalizeString(rawDoc[referenceField]);
+  const referencePostId = extractReferencePostId(rawDoc[referenceField]);
   const harvestedDate = parseDate(rawDoc[harvestedDateField]);
 
   if (!date || !account || !content) {
@@ -115,7 +173,7 @@ sourceCollection.find({}).forEach((rawDoc) => {
     date: date,
     account: account,
     content: content,
-    referencePostId: referenceRaw || null,
+    referencePostId: referencePostId,
     metadata: {
       externalAuthorId: normalizeString(rawDoc[externalAuthorIdField]) || null,
       region: normalizeString(rawDoc[regionField]) || null,
