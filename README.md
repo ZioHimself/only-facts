@@ -15,4 +15,4 @@ This project uses **Specification-Driven Development (SDD)**, an AI-assisted wor
 [Zanzotta](mailto:andrea.zanzott@gmail.com)
 [jansaam](mailto:jan.saam.atwork@gmail.com)
 [donsyor](mailto:yorandons@gmail.com)
-[Yoda](mailto:gam3rzrepublik@gmail.com)
+[YodaGitMaster](mailto:gam3rzrepublik@gmail.com)
