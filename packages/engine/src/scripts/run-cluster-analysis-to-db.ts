@@ -24,7 +24,7 @@
  *   --velocity-threshold <n>    Posts/window threshold (default: 10)
  */
 
-import mongoose, { Schema, Connection, Model } from 'mongoose';
+import mongoose, { Schema, Connection } from 'mongoose';
 import { clusterByTfIdfTimeWindows } from '../services/tfidf-time-window-clustering.js';
 import type { BaselineClusteringPost, TfIdfTimeWindowConfig } from '../types/clustering.js';
 
@@ -812,13 +812,13 @@ function parseArgs(argv: string[]): CliOptions {
       i += 1;
     }
   }
-  const num = (flag: string, def: number) => {
+  const num = (flag: string, def: number): number => {
     const v = args.get(flag);
     if (!v) return def;
     const n = Number(v);
     return Number.isFinite(n) ? n : def;
   };
-  const date = (flag: string) => {
+  const date = (flag: string): Date | null => {
     const v = args.get(flag);
     if (!v) return null;
     const d = new Date(v);
@@ -863,7 +863,7 @@ async function main(): Promise<void> {
   const AnalysisRunModel = conn.model('AnalysisRun', analysisRunSchema);
 
   // Create analysis run record
-  const analysisRun = await AnalysisRunModel.create({
+  await AnalysisRunModel.create({
     runId,
     status: 'running',
     startedAt: new Date(),
@@ -884,7 +884,11 @@ async function main(): Promise<void> {
   try {
     // ── 1. Fetch posts from normalized_posts ─────────────────────────────────
     console.log('\n[1/7] Fetching posts from normalized_posts…');
-    const normalizedPostsCollection = conn.db.collection('normalized_posts');
+    const db = conn.db;
+    if (!db) {
+      throw new Error('Database connection not established');
+    }
+    const normalizedPostsCollection = db.collection('normalized_posts');
 
     const dbQuery: Record<string, unknown> = {};
     if (opts.region) dbQuery['metadata.region'] = opts.region;
@@ -1166,7 +1170,7 @@ async function main(): Promise<void> {
     console.log('\n');
     const scores = workItems.map((w) => w.misinformationScore);
     const spam = workItems.map((w) => w.spamLikelihood);
-    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / Math.max(arr.length, 1);
+    const avg = (arr: number[]): number => arr.reduce((a, b) => a + b, 0) / Math.max(arr.length, 1);
 
     const topDangerDays = dailyRecords
       .filter((d) => d.dominantEmotionDangerLevel >= 1)

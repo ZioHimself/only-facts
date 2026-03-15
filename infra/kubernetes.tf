@@ -277,6 +277,16 @@ resource "kubernetes_deployment" "only_facts_reports" {
             value = "http://only-facts.only-facts.svc.cluster.local"
           }
 
+          env {
+            name = "MONGO_URI"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.mongo_uri.metadata[0].name
+                key  = "MONGO_URI"
+              }
+            }
+          }
+
           resources {
             requests = {
               cpu    = "100m"
