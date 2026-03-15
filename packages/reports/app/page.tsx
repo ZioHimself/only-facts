@@ -153,6 +153,20 @@ interface CohortComparison {
   readonly riskScore: number;
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+}
+
+function formatStatNumber(value: number | null): string {
+  if (value === null) {
+    return '--';
+  }
+  return formatNumber(value);
+}
+
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0;
   return () => {
@@ -252,6 +266,18 @@ function ViewBody({
   onOpenClusterGraph,
   cohortData,
   onCompareCohorts,
+  mongoCollection,
+  mongoQuery,
+  mongoLimit,
+  mongoResultText,
+  mongoLoading,
+  mongoExploreDisabled,
+  onMongoCollectionChange,
+  onMongoQueryChange,
+  onMongoLimitChange,
+  onMongoLoadCollections,
+  onMongoLoadSample,
+  onMongoSearch,
 }: {
   readonly activeView: SidebarView;
   readonly dynamicSummary: typeof summarySegments;
@@ -274,7 +300,74 @@ function ViewBody({
   readonly onOpenClusterGraph: () => void;
   readonly cohortData: readonly CohortComparison[];
   readonly onCompareCohorts: () => void;
+  readonly mongoCollection: string;
+  readonly mongoQuery: string;
+  readonly mongoLimit: string;
+  readonly mongoResultText: string;
+  readonly mongoLoading: boolean;
+  readonly mongoExploreDisabled: boolean;
+  readonly onMongoCollectionChange: (nextValue: string) => void;
+  readonly onMongoQueryChange: (nextValue: string) => void;
+  readonly onMongoLimitChange: (nextValue: string) => void;
+  readonly onMongoLoadCollections: () => void;
+  readonly onMongoLoadSample: () => void;
+  readonly onMongoSearch: () => void;
 }) {
+  const mongoStats = useMemo(() => {
+    if (activeView !== 'explore') {
+      return null;
+    }
+
+    let payload: Record<string, unknown> | null = null;
+    try {
+      const parsed = JSON.parse(mongoResultText) as unknown;
+      if (parsed && typeof parsed === 'object') {
+        payload = parsed as Record<string, unknown>;
+      }
+    } catch {
+      payload = null;
+    }
+
+    const collectionsCount =
+      toFiniteNumber(payload?.collectionsCount) ??
+      (Array.isArray(payload?.collections) ? payload.collections.length : null);
+    const returnedCount = toFiniteNumber(payload?.count);
+    const matchedDocuments = toFiniteNumber(payload?.matchedDocuments);
+    const totalDocuments = toFiniteNumber(payload?.totalDocuments);
+
+    const database =
+      typeof payload?.database === 'string' && payload.database.trim().length > 0
+        ? payload.database
+        : '--';
+    const collection =
+      typeof payload?.collection === 'string' && payload.collection.trim().length > 0
+        ? payload.collection
+        : mongoCollection.trim() || '--';
+    const action =
+      typeof payload?.action === 'string' && payload.action.trim().length > 0
+        ? payload.action.toUpperCase()
+        : 'N/A';
+    const query =
+      typeof payload?.query === 'string' && payload.query.trim().length > 0
+        ? payload.query
+        : mongoQuery.trim() || 'none';
+
+    const mode = mongoExploreDisabled ? 'Disabled' : 'Live';
+    const totalEntries = totalDocuments;
+
+    return {
+      mode,
+      database,
+      collection,
+      action,
+      query,
+      collectionsCount,
+      returnedCount,
+      matchedDocuments,
+      totalEntries,
+    };
+  }, [activeView, mongoCollection, mongoExploreDisabled, mongoQuery, mongoResultText]);
+
   if (activeView === 'handlers') {
     return (
       <section className={styles.utilityPanel} aria-label="Social handlers view">
@@ -345,6 +438,106 @@ function ViewBody({
         <pre className={styles.rawLogsBox}>{rawServerLogsText}</pre>
         <h3 className={styles.statusTitle}>Raw Source Payload</h3>
         <pre className={styles.rawDataBox}>{rawDataText}</pre>
+      </section>
+    );
+  }
+
+  if (activeView === 'explore') {
+    return (
+      <section className={styles.utilityPanel} aria-label="Mongo exploration view">
+        <h2 className={styles.utilityTitle}>Mongo Explorer</h2>
+        <p className={styles.utilityText}>
+          Browse what MongoDB currently contains. Set source to DB URL, turn Mock OFF, then use
+          collection/sample/search.
+        </p>
+        {mongoStats ? (
+          <>
+            <div className={styles.statusGrid}>
+              <article className={styles.statusCard}>
+                <h3 className={styles.statusTitle}>Source</h3>
+                <p className={styles.statusValue}>
+                  {mongoLoading ? 'Loading...' : mongoStats.mode}
+                </p>
+              </article>
+              <article className={styles.statusCard}>
+                <h3 className={styles.statusTitle}>Database</h3>
+                <p className={styles.statusValue}>{mongoStats.database}</p>
+              </article>
+              <article className={styles.statusCard}>
+                <h3 className={styles.statusTitle}>Collection</h3>
+                <p className={styles.statusValue}>{mongoStats.collection}</p>
+              </article>
+              <article className={styles.statusCard}>
+                <h3 className={styles.statusTitle}>Total Entries</h3>
+                <p className={styles.statusValue}>
+                  {mongoLoading ? 'Loading...' : formatStatNumber(mongoStats.totalEntries)}
+                </p>
+              </article>
+            </div>
+            <p className={styles.statusMeta}>
+              Action: {mongoStats.action} | Query: {mongoStats.query} | Collections:{' '}
+              {formatStatNumber(mongoStats.collectionsCount)} | Returned:{' '}
+              {formatStatNumber(mongoStats.returnedCount)} | Matched:{' '}
+              {formatStatNumber(mongoStats.matchedDocuments)}
+            </p>
+          </>
+        ) : null}
+        <h3 className={styles.statusTitle}>Mongo Explorer</h3>
+        <div className={styles.handlerInputRow}>
+          <input
+            className={styles.handlerInput}
+            value={mongoCollection}
+            onChange={(event) => onMongoCollectionChange(event.target.value)}
+            placeholder="Collection (e.g. signals)"
+            disabled={mongoExploreDisabled}
+          />
+          <input
+            className={styles.handlerInput}
+            value={mongoQuery}
+            onChange={(event) => onMongoQueryChange(event.target.value)}
+            placeholder="Search term (text, label, username, hashtag)"
+            disabled={mongoExploreDisabled}
+          />
+          <input
+            className={styles.handlerInput}
+            type="number"
+            min={1}
+            max={50}
+            value={mongoLimit}
+            onChange={(event) => onMongoLimitChange(event.target.value)}
+            placeholder="Entries (1-50)"
+            disabled={mongoExploreDisabled}
+          />
+        </div>
+        <div className={styles.networkActions}>
+          <button
+            type="button"
+            className={styles.networkActionButton}
+            onClick={onMongoLoadCollections}
+            disabled={mongoExploreDisabled || mongoLoading}
+          >
+            Collections
+          </button>
+          <button
+            type="button"
+            className={styles.networkActionButton}
+            onClick={onMongoLoadSample}
+            disabled={mongoExploreDisabled || mongoLoading}
+          >
+            Sample Docs
+          </button>
+          <button
+            type="button"
+            className={styles.networkActionButton}
+            onClick={onMongoSearch}
+            disabled={mongoExploreDisabled || mongoLoading || mongoQuery.trim().length === 0}
+          >
+            Search
+          </button>
+        </div>
+        <pre className={styles.rawDataBox}>
+          {mongoLoading ? 'Loading Mongo explorer...' : mongoResultText}
+        </pre>
       </section>
     );
   }
@@ -570,6 +763,19 @@ export default function Home() {
   });
   const [clusterSeed, setClusterSeed] = useState<number>(() => Date.now());
   const [cohortSeed, setCohortSeed] = useState<number>(() => Date.now() + 1337);
+  const [mongoCollection, setMongoCollection] = useState<string>('signals');
+  const [mongoQuery, setMongoQuery] = useState<string>('');
+  const [mongoLimit, setMongoLimit] = useState<string>('10');
+  const [mongoResultText, setMongoResultText] = useState<string>(
+    JSON.stringify(
+      {
+        info: 'Mongo explorer ready. Choose DB URL mode, turn Mock OFF, then click Collections/Sample/Search.',
+      },
+      null,
+      2
+    )
+  );
+  const [mongoLoading, setMongoLoading] = useState<boolean>(false);
 
   const projectFactor = useMemo<number>(() => {
     if (selectedProject === 'Cross-Border Influence Monitoring') {
@@ -730,6 +936,10 @@ export default function Home() {
     () => generateMockCohorts(cohortSeed),
     [cohortSeed]
   );
+  const mongoExploreDisabled = useMemo<boolean>(
+    () => mockDataEnabled || dataSourceType !== 'db_url',
+    [dataSourceType, mockDataEnabled]
+  );
 
   const handleHandlerDraftChange = (platform: string, nextValue: string) => {
     setHandlerDrafts((previous) => ({
@@ -753,6 +963,43 @@ export default function Home() {
       ...previous,
       [platform]: '',
     }));
+  };
+
+  const runMongoExplore = async (action: 'collections' | 'sample' | 'search') => {
+    if (mongoExploreDisabled) {
+      return;
+    }
+
+    setMongoLoading(true);
+    try {
+      const parsedLimit = Number.parseInt(mongoLimit.trim(), 10);
+      const safeLimit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(50, parsedLimit)) : 10;
+      const params = new URLSearchParams({
+        action,
+        collection: mongoCollection.trim() || 'signals',
+        limit: action === 'collections' ? '50' : String(safeLimit),
+      });
+      if (action === 'search') {
+        params.set('q', mongoQuery.trim());
+      }
+
+      const response = await fetch(`/api/mongo-explore?${params.toString()}`);
+      const payload = (await response.json()) as Record<string, unknown>;
+      setMongoResultText(JSON.stringify(payload, null, 2));
+    } catch (error) {
+      setMongoResultText(
+        JSON.stringify(
+          {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Unknown fetch error',
+          },
+          null,
+          2
+        )
+      );
+    } finally {
+      setMongoLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -813,7 +1060,7 @@ export default function Home() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [activeView, dataSourceType, isServerLogsOpen, mockDataEnabled]);
+  }, [activeView, dataSourceType, dbUrl, isServerLogsOpen, mockDataEnabled]);
 
   return (
     <main className={styles.page}>
@@ -873,6 +1120,18 @@ export default function Home() {
               onCompareCohorts={() =>
                 setCohortSeed(Date.now() + Math.floor(Math.random() * 100000))
               }
+              mongoCollection={mongoCollection}
+              mongoQuery={mongoQuery}
+              mongoLimit={mongoLimit}
+              mongoResultText={mongoResultText}
+              mongoLoading={mongoLoading}
+              mongoExploreDisabled={mongoExploreDisabled}
+              onMongoCollectionChange={setMongoCollection}
+              onMongoQueryChange={setMongoQuery}
+              onMongoLimitChange={setMongoLimit}
+              onMongoLoadCollections={() => void runMongoExplore('collections')}
+              onMongoLoadSample={() => void runMongoExplore('sample')}
+              onMongoSearch={() => void runMongoExplore('search')}
             />
           </div>
         </div>

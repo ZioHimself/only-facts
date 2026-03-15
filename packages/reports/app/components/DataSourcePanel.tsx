@@ -91,12 +91,13 @@ export function DataSourcePanel({
           <span className={styles.dataSourceLabel}>Database URL</span>
           <input
             className={styles.dataSourceInput}
-            type="url"
+            type="text"
             value={dbUrl}
             onChange={(event) => onDbUrlChange(event.target.value)}
-            placeholder="postgresql://user:password@host:5432/database"
+            placeholder="mongodb://user:password@host:27017/database?authSource=database"
             disabled={externalSourcesDisabled}
           />
+          <span className={styles.dataSourceHint}>Leave empty to auto-use server MONGO_URI or DATABASE_URL.</span>
         </label>
       ) : null}
 

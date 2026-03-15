@@ -1,7 +1,14 @@
 import type { ReactElement } from 'react';
 import styles from '@/app/styles/dashboard.module.css';
 
-export type SidebarView = 'dashboard' | 'handlers' | 'reports' | 'operations' | 'network' | 'about';
+export type SidebarView =
+  | 'dashboard'
+  | 'handlers'
+  | 'reports'
+  | 'explore'
+  | 'operations'
+  | 'network'
+  | 'about';
 
 interface SidebarProps {
   readonly activeView: SidebarView;
@@ -70,6 +77,16 @@ function DocumentIcon() {
   );
 }
 
+function ExploreIcon() {
+  return (
+    <svg className={styles.sidebarSvg} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M9 9.2 15.8 6.5l-2.7 6.8L6.4 16z" />
+      <circle cx="12" cy="12" r="1.3" />
+    </svg>
+  );
+}
+
 function AboutIcon() {
   return (
     <svg className={styles.sidebarSvg} viewBox="0 0 24 24" aria-hidden="true">
@@ -99,6 +116,7 @@ interface NavItem {
 const navItems: readonly NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', IconComponent: GridIcon },
   { key: 'handlers', label: 'Handlers', IconComponent: ComposeIcon },
+  { key: 'explore', label: 'Explore', IconComponent: ExploreIcon },
   { key: 'operations', label: 'Operations', IconComponent: PieIcon },
   { key: 'network', label: 'Network', IconComponent: NetworkIcon },
   { key: 'reports', label: 'Raw Data', IconComponent: DocumentIcon },
